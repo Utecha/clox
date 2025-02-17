@@ -1,3 +1,5 @@
-bin/
-.zig-cache/
-zig-out/
+# Build Directory
+build/
+
+# Scratch Files
+scratch*

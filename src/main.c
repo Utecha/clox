@@ -1,82 +1,109 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-#include <readline/history.h>
-#include <readline/readline.h>
-#include "include/vm.h"
+#include "internal.h"
+#include "vm.h"
 
-/*
- * NOTE: Readline is included AFTER stdio because of the
- * need for the 'FILE' type.
-*/
+#if defined(__linux__)
+    #include <readline/history.h>
+    #include <readline/readline.h>
+#else
+    #include <string.h>
 
-static void repl() {
-    for (;;) {
-        char *line = readline(">>> ");
-        if (line == NULL) {
+    static char buffer[2048];
+
+    char *readline(char *prompt)
+    {
+        fputs(prompt, stdout);
+        fgets(buffer, 2048, stdin);
+        size_t length = strlen(buffer);
+        char *copy = (char *)malloc(length + 1);
+        strcpy(copy, buffer);
+        copy[length + 1] = '\0';
+        return copy;
+    }
+
+    void add_history(char *unused) {}
+#endif
+
+static void repl(LoxVM *vm)
+{
+    for (;;)
+    {
+        char *source = readline(">>> ");
+        if (source == NULL)
+        {
             printf("\n");
-            clear_history();
             return;
         }
 
-        add_history(line);
-        interpret(line);
-        free(line);
+        add_history(source);
+        interpret(vm, source);
+        free(source);
     }
 }
 
-static char *read_file(const char *path)
+static char *readSource(const char *path)
 {
     FILE *file = fopen(path, "rb");
-    if (file == NULL) {
-        fprintf(stderr, "Could not open file '%s'. Did you spell it right?\n", path);
-        exit(74);
+    if (!file)
+    {
+        printf("Could not open file '%s'. Did you spell it right?", path);
+        return NULL;
     }
 
     fseek(file, 0L, SEEK_END);
-    size_t file_size = ftell(file);
+    size_t fileSize = ftell(file);
     rewind(file);
 
-    char *buffer = (char *)malloc(file_size + 1);
-    if (file == NULL) {
-        fprintf(stderr, "Not enough memory to read '%s'\n", path);
-        exit(74);
+    char *buffer = (char *)malloc(fileSize + 1);
+    if (!buffer) return NULL;
+
+    size_t length = fread(buffer, sizeof(char), fileSize, file);
+    if (length < fileSize)
+    {
+        printf("Failed to read file '%s'", path);
+        return NULL;
     }
 
-    size_t bytes_read = fread(buffer, sizeof(char), file_size, file);
-    if (bytes_read < file_size) {
-        fprintf(stderr, "Could not read file '%s'", path);
-        exit(74);
-    }
-
-    buffer[bytes_read] = '\0';
+    buffer[length] = '\0';
     fclose(file);
     return buffer;
 }
 
-static void run_file(const char *path)
+static void runSource(LoxVM *vm, const char *path)
 {
-    char *source = read_file(path);
-    VMResult result = interpret(source);
+    char *source = readSource(path);
+    if (!source)
+    {
+        setExit(65);
+        return;
+    }
+
+    InterpretResult result = interpret(vm, source);
     free(source);
 
-    if (result == VM_COMPILE_ERROR) exit(65);
-    if (result == VM_RUNTIME_ERROR) exit(70);
+    if (result == RESULT_COMPILE_ERROR) setExit(65);
+    if (result == RESULT_RUNTIME_ERROR) setExit(70);
 }
 
 int main(int argc, char **argv)
 {
-    init_vm();
+    LoxVM vm;
+    initVM(&vm);
 
-    if (argc == 1) {
-        repl();
-    } else if (argc == 2) {
-        run_file(argv[1]);
-    } else {
-        fprintf(stderr, "Usage: clox [script.lox]");
-        exit(64);
+    switch (argc)
+    {
+        case 1:
+            repl(&vm);
+            break;
+        case 2:
+            runSource(&vm, argv[1]);
+            break;
+        default:
+            printf("Usage: lox [script]\n");
+            break;
     }
 
-    free_vm();
-    return 0;
+    freeVM(&vm);
+    return getExit();
 }
