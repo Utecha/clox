@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "internal.h"
-#include "vm.h"
+#include "vm/vm.h"
 
 #if defined(__linux__)
     #include <readline/history.h>
@@ -17,8 +17,8 @@
         fgets(buffer, 2048, stdin);
         size_t length = strlen(buffer);
         char *copy = (char *)malloc(length + 1);
-        strcpy(copy, buffer);
-        copy[length + 1] = '\0';
+        memcpy(copy, buffer, length);
+        copy[length] = '\0';
         return copy;
     }
 
@@ -55,19 +55,19 @@ static char *readSource(const char *path)
     size_t fileSize = ftell(file);
     rewind(file);
 
-    char *buffer = (char *)malloc(fileSize + 1);
-    if (!buffer) return NULL;
+    char *source = (char *)malloc(fileSize + 1);
+    if (!source) return NULL;
 
-    size_t length = fread(buffer, sizeof(char), fileSize, file);
+    size_t length = fread(source, sizeof(char), fileSize, file);
     if (length < fileSize)
     {
         printf("Failed to read file '%s'", path);
         return NULL;
     }
 
-    buffer[length] = '\0';
+    source[length] = '\0';
     fclose(file);
-    return buffer;
+    return source;
 }
 
 static void runSource(LoxVM *vm, const char *path)

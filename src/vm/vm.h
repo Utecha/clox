@@ -1,8 +1,8 @@
 #ifndef lox_vm_h
 #define lox_vm_h
 
-#include "common.h"
 #include "chunk.h"
+#include "common.h"
 #include "value.h"
 
 #define STACK_MAX 256
@@ -21,6 +21,7 @@ struct LoxVM
     Value stack[STACK_MAX];
     Value *stackTop;
     Obj *objects;
+    Compiler *compiler;
 };
 
 void initVM(LoxVM *vm);
