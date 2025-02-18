@@ -30,6 +30,11 @@ const char *opcodes[OP_COUNT] = {
     // Byte Instructions (2 bytes)
     [OP_GET_LOCAL]      = "GET LOCAL",
     [OP_SET_LOCAL]      = "SET LOCAL",
+
+    // Jump Instructions (3 bytes)
+    [OP_JUMP]           = "JUMP",
+    [OP_JUMP_IF]        = "JUMP IF",
+    [OP_LOOP]           = "LOOP",
 };
 
 const char *tokenTypes[TK_COUNT] = {
@@ -94,6 +99,14 @@ static int byteInstruction(const char *name, Chunk *chunk, int offset)
     return offset + 2;
 }
 
+static int jumpInstruction(const char *name, int sign, Chunk *chunk, int offset)
+{
+    uint16_t jump = (uint16_t)(chunk->code.data[offset + 1] << 8);
+    jump |= chunk->code.data[offset + 2];
+    printf("%-14s %4d -> %d\n", name, offset, offset + 3 + sign * jump);
+    return offset + 3;
+}
+
 static int simpleInstruction(const char *name, int offset)
 {
     puts(name);
@@ -148,6 +161,11 @@ int disassembleInstruction(Chunk *chunk, int offset)
         case OP_GET_LOCAL:
         case OP_SET_LOCAL:
             return byteInstruction(name, chunk, offset);
+        case OP_JUMP:
+        case OP_JUMP_IF:
+            return jumpInstruction(name, 1, chunk, offset);
+        case OP_LOOP:
+            return jumpInstruction(name, -1, chunk, offset);
         default:
             printf("Unknown OpCode: %d", instruction);
             return offset + 1;

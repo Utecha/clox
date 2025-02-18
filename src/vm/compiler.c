@@ -10,7 +10,8 @@
     #include "debug.h"
 #endif
 
-#define MAX_LOCALS 256
+#define MAX_LOCALS  256
+#define MAX_JUMP    1 << 16
 
 typedef enum
 {
@@ -184,6 +185,26 @@ static uint8_t makeConstant(Compiler *compiler, Value value)
 static void emitConstant(Compiler *compiler, Value value)
 {
     emitBytes(compiler, OP_CONSTANT, makeConstant(compiler, value));
+}
+
+static int emitJump(Compiler *compiler, uint8_t instruction)
+{
+    emitByte(compiler, instruction);
+    emitByte(compiler, 0xff);
+    emitByte(compiler, 0xff);
+    return currentChunk(compiler)->code.count - 2;
+}
+
+static void patchJump(Compiler *compiler, int offset)
+{
+    int jump = currentChunk(compiler)->code.count - offset - 2;
+    if (jump > MAX_JUMP)
+    {
+        error(compiler, "Too much code to jump over");
+    }
+
+    currentChunk(compiler)->code.data[offset] = (jump >> 8) & 0xff;
+    currentChunk(compiler)->code.data[offset + 1] = jump & 0xff;
 }
 
 static void emitReturn(Compiler *compiler)
@@ -482,6 +503,24 @@ static void expressionStatement(Compiler *compiler)
     emitByte(compiler, OP_POP);
 }
 
+static void ifStatement(Compiler *compiler)
+{
+    // consume(compiler, TK_LPAREN, "Expected '(' after 'if'");
+    expression(compiler);
+    // consume(compiler, TK_RPAREN, "Expected ')' after 'if' condition");
+
+    int thenJump = emitJump(compiler, OP_JUMP_IF);
+    emitByte(compiler, OP_POP);
+    statement(compiler);
+
+    int elseJump = emitJump(compiler, OP_JUMP);
+    patchJump(compiler, thenJump);
+    emitByte(compiler, OP_POP);
+
+    if (match(compiler, TK_ELSE)) statement(compiler);
+    patchJump(compiler, elseJump);
+}
+
 static void printStatement(Compiler *compiler)
 {
     expression(compiler);
@@ -491,7 +530,11 @@ static void printStatement(Compiler *compiler)
 
 static void statement(Compiler *compiler)
 {
-    if (match(compiler, TK_PRINT))
+    if (match(compiler, TK_IF))
+    {
+        ifStatement(compiler);
+    }
+    else if (match(compiler, TK_PRINT))
     {
         printStatement(compiler);
     }

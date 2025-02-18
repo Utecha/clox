@@ -32,6 +32,11 @@ typedef enum
     OP_GET_LOCAL,
     OP_SET_LOCAL,
 
+    // Jump Instructions (3 bytes)
+    OP_JUMP,
+    OP_JUMP_IF,
+    OP_LOOP,
+
     // Count
     OP_COUNT,
 } OpCode;

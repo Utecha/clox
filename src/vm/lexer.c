@@ -231,8 +231,8 @@ Token getToken(Lexer *lexer)
         case '*':   return makeToken(lexer, TK_STAR);
         case '!':   return twoCharToken(lexer, '=', TK_BANGEQ, TK_BANG);
         case '=':   return twoCharToken(lexer, '=', TK_EQEQ, TK_EQUAL);
-        case '<':   return twoCharToken(lexer, '=', TK_GTEQ, TK_GT);
-        case '>':   return twoCharToken(lexer, '=', TK_LTEQ, TK_LT);
+        case '>':   return twoCharToken(lexer, '=', TK_GTEQ, TK_GT);
+        case '<':   return twoCharToken(lexer, '=', TK_LTEQ, TK_LT);
         case '"':   return string(lexer);
     }
 
