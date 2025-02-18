@@ -287,13 +287,13 @@ static void endScope(Compiler *compiler)
 
 static void conditional(Compiler *compiler, bool canAssign)
 {
-    // int ifJump = emitJump(compiler, OP_JUMP_IF);
+    int ifJump = emitJump(compiler, OP_JUMP_IF);
     parsePrecedence(compiler, PREC_CONDITIONAL);
     consume(compiler, TK_COLON, "Expected ':' after conditional 'then' branch");
-    // int elseJump = emitJump(compiler, JUMP);
-    // patchJump(compiler, ifJump);
+    int elseJump = emitJump(compiler, OP_JUMP);
+    patchJump(compiler, ifJump);
     parsePrecedence(compiler, PREC_ASSIGNMENT);
-    // patchJump(compiler, elseJump);
+    patchJump(compiler, elseJump);
 }
 
 static void binary(Compiler *compiler, bool canAssign)
