@@ -3,6 +3,7 @@
 
 #include "chunk.h"
 #include "common.h"
+#include "table.h"
 #include "value.h"
 
 #define STACK_MAX 256
@@ -21,6 +22,7 @@ struct LoxVM
     Value stack[STACK_MAX];
     Value *stackTop;
     Obj *objects;
+    Table strings;
     Compiler *compiler;
 };
 

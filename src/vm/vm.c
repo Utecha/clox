@@ -32,10 +32,12 @@ void initVM(LoxVM *vm)
 {
     resetStack(vm);
     vm->objects = NULL;
+    tableInit(&vm->strings);
 }
 
 void freeVM(LoxVM *vm)
 {
+    tableFree(&vm->strings);
     freeObjects(vm);
 }
 

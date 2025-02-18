@@ -78,7 +78,6 @@ static inline bool isObjType(Value value, ObjType type)
 
 #define IS_STRING(value)    isObjType(value, OBJ_STRING)
 
-void hashString(ObjString *string);
 ObjString *newStringLength(LoxVM *vm, const char *chars, size_t length);
 ObjString *newString(LoxVM *vm, char *chars);
 

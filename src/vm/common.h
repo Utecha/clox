@@ -7,6 +7,7 @@
 
 typedef struct LoxVM LoxVM;
 typedef struct Compiler Compiler;
+typedef struct Table Table;
 
 #ifdef DEBUG
     /*

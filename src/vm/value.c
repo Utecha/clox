@@ -22,27 +22,49 @@ static ObjString *allocateString(LoxVM *vm, size_t length)
     return string;
 }
 
-void hashString(ObjString *string)
+// static void hashString(ObjString *string)
+// {
+//     uint32_t hash = 2166136261u;
+
+//     for (uint32_t i = 0; i < string->length; i++)
+//     {
+//         hash ^= string->value[i];
+//         hash *= 16777619;
+//     }
+
+//     string->hash = hash;
+// }
+
+static uint32_t hashCString(const char *chars, uint32_t length)
 {
     uint32_t hash = 2166136261u;
 
-    for (uint32_t i = 0; i < string->length; i++)
+    for (uint32_t i = 0; i < length; i++)
     {
-        hash ^= string->value[i];
+        hash ^= chars[i];
         hash *= 16777619;
     }
 
-    string->hash = hash;
+    return hash;
 }
 
+// TODO: Come up with a better way to manage interning strings so that
+// there is no need to even have, let alone call, 'hashCString'.
+// Unless '-DSNIPPETS=ON' is provided to the cmake config, 'hashString'
+// must be commented out in order to compile now.
 ObjString *newStringLength(LoxVM *vm, const char *chars, size_t length)
 {
+    uint32_t hash = hashCString(chars, (uint32_t)length);
+    ObjString *interned = tableFindString(&vm->strings, chars, (uint32_t)length, hash);
+    if (interned != NULL) return interned;
+
     ObjString *string = allocateString(vm, length);
 
     if (length > 0 && chars != NULL)
         { memcpy(string->value, chars, length); }
 
-    hashString(string);
+    string->hash = hash;
+    tableSet(&vm->strings, string, NIL_VAL);
     return string;
 }
 
@@ -93,14 +115,7 @@ bool valuesEqual(Value a, Value b)
         case VAL_BOOL:      return AS_BOOL(a) == AS_BOOL(b);
         case VAL_NIL:       return true;
         case VAL_NUMBER:    return AS_NUMBER(a) == AS_NUMBER(b);
-        case VAL_OBJ:
-        {
-            ObjString *aString = AS_STRING(a);
-            ObjString *bString = AS_STRING(b);
-            return aString->length == bString->length &&
-                aString->hash == bString->hash &&
-                memcmp(aString->value, bString->value, aString->length) == 0;
-        } break;
+        case VAL_OBJ:       return AS_OBJ(a) == AS_OBJ(b);
         default:            return false; // Unreachable
     }
 }
