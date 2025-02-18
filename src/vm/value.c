@@ -5,12 +5,38 @@
 #include "value.h"
 #include "vm.h"
 
+DEFINE_ARRAY(Value, Value);
+
 static void initObj(LoxVM *vm, Obj *obj, ObjType type)
 {
     obj->type = type;
     obj->isDark = false;
     obj->next = vm->objects;
     vm->objects = obj;
+}
+
+ObjFn *newFunction(LoxVM *vm)
+{
+    ObjFn *function = ALLOCATE(ObjFn);
+    initObj(vm, &function->obj, OBJ_FUNCTION);
+    function->arity = 0;
+    initChunk(&function->chunk);
+    function->name = NULL;
+    // initByteArray(&function->code);
+    // initValueArray(&function->constants);
+    // function->debug.name = NULL;
+    // initLineArray(&function->debug.lines);
+
+    return function;
+}
+
+ObjNative *newNative(LoxVM *vm, NativeFn function, int arity)
+{
+    ObjNative *native = ALLOCATE(ObjNative);
+    initObj(vm, &native->obj, OBJ_NATIVE);
+    native->function = function;
+    native->arity = arity;
+    return native;
 }
 
 static ObjString *allocateString(LoxVM *vm, size_t length)
@@ -73,10 +99,27 @@ ObjString *newString(LoxVM *vm, char *chars)
     return newStringLength(vm, chars, strlen(chars));
 }
 
+static void printFunction(ObjFn *function)
+{
+    if (function->name == NULL)
+    {
+        printf("<fn main>");
+        return;
+    }
+
+    printf("<fn %s>", function->name->value);
+}
+
 static void printObject(Value value)
 {
     switch (OBJ_TYPE(value))
     {
+        case OBJ_FUNCTION:
+            printFunction(AS_FUNCTION(value));
+            break;
+        case OBJ_NATIVE:
+            printf("<native fn>");
+            break;
         case OBJ_STRING:
             printf("%s", AS_CSTRING(value));
             break;
@@ -94,7 +137,7 @@ void printValue(Value value)
             printf("nil");
             break;
         case VAL_NUMBER:
-            printf("%g", AS_NUMBER(value));
+            printf("%.127g", AS_NUMBER(value));
             break;
         case VAL_OBJ:
             printObject(value);

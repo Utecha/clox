@@ -2,9 +2,12 @@
 #define lox_value_h
 
 #include "common.h"
+#include "utils.h"
 
 typedef enum
 {
+    OBJ_FUNCTION,
+    OBJ_NATIVE,
     OBJ_STRING,
 } ObjType;
 
@@ -58,6 +61,52 @@ typedef struct
 
 #endif // NAN_TAGGING
 
+DECLARE_ARRAY(Value, Value);
+
+typedef struct
+{
+    ByteArray code;
+    LineArray lines;
+    ValueArray constants;
+} Chunk;
+
+void initChunk(Chunk *chunk);
+void freeChunk(Chunk *chunk);
+void writeChunk(Chunk *chunk, uint8_t byte, int line);
+int addConstant(Chunk *chunk, Value value);
+int getLine(Chunk *chunk, int offset);
+
+typedef struct
+{
+    Obj obj;
+    int arity;
+    Chunk chunk;
+    ObjString *name;
+    // ByteArray code;
+    // ValueArray constants;
+    // struct
+    // {
+    //     ObjString *name;
+    //     LineArray lines;
+    // } debug;
+} ObjFn;
+
+typedef struct
+{
+    ObjFn *function;
+    uint8_t *ip;
+    Value *slots;
+} CallFrame;
+
+typedef Value (*NativeFn)(int argc, Value *args);
+
+typedef struct
+{
+    Obj obj;
+    NativeFn function;
+    int arity;
+} ObjNative;
+
 struct ObjString
 {
     Obj obj;
@@ -73,11 +122,18 @@ static inline bool isObjType(Value value, ObjType type)
     return IS_OBJ(value) && OBJ_TYPE(value) == type;
 }
 
+#define AS_FUNCTION(value)  ((ObjFn *)AS_OBJ(value))
+#define AS_NATIVE(value)    ((ObjNative *)AS_OBJ(value))
+#define AS_NATIVE_FN(value) (AS_NATIVE(value)->function)
 #define AS_STRING(value)    ((ObjString *)AS_OBJ(value))
-#define AS_CSTRING(value)   (((ObjString *)AS_OBJ(value))->value)
+#define AS_CSTRING(value)   (AS_STRING(value)->value)
 
+#define IS_FUNCTION(value)  isObjType(value, OBJ_FUNCTION)
+#define IS_NATIVE(value)    isObjType(value, OBJ_NATIVE)
 #define IS_STRING(value)    isObjType(value, OBJ_STRING)
 
+ObjFn *newFunction(LoxVM *vm);
+ObjNative *newNative(LoxVM *vm, NativeFn function, int arity);
 ObjString *newStringLength(LoxVM *vm, const char *chars, size_t length);
 ObjString *newString(LoxVM *vm, char *chars);
 

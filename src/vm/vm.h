@@ -6,7 +6,8 @@
 #include "table.h"
 #include "value.h"
 
-#define STACK_MAX 256
+#define FRAMES_MAX 64
+#define STACK_MAX (FRAMES_MAX * (1 << 8))
 
 typedef enum
 {
@@ -17,8 +18,8 @@ typedef enum
 
 struct LoxVM
 {
-    Chunk *chunk;
-    uint8_t *ip;
+    CallFrame frames[FRAMES_MAX];
+    int frameCount;
     Value stack[STACK_MAX];
     Value *stackTop;
     Obj *objects;

@@ -38,7 +38,7 @@ if(WIN32)
     endif()
 else()
     set_target_properties(${PROJECT_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${CMAKE_BUILD_TYPE})
-    target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Werror -Wpedantic -Wno-unused-parameter)
+    target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Werror -Wno-unused-parameter)
 
     if(SNIPPETS)
         target_compile_options(${PROJECT_NAME} PRIVATE -Wno-unused-function)

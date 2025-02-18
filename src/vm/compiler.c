@@ -29,6 +29,12 @@ typedef enum
     PREC_PRIMARY
 } Precedence;
 
+typedef enum
+{
+    TYPE_FUNCTION,
+    TYPE_MAIN,
+} FunctionType;
+
 typedef void (*ParseFn)(Compiler *compiler, bool canAssign);
 
 typedef struct
@@ -67,8 +73,9 @@ typedef struct Loop
 struct Compiler
 {
     Parser *parser;
-    Chunk *chunk;
     Compiler *enclosing;
+    ObjFn *function;
+    FunctionType type;
     Loop *loop;
     Local locals[MAX_LOCALS];
     int localCount;
@@ -156,19 +163,36 @@ static bool match(Compiler *compiler, TokenType type)
 }
 
 // Compiler --------------------------------------------------------------------
-static void initCompiler(Compiler *compiler, Compiler *enclosing, Parser *parser)
+static void initCompiler(Compiler *compiler, Parser *parser, Compiler *enclosing, FunctionType type)
 {
     compiler->parser = parser;
     compiler->enclosing = enclosing;
+    compiler->function = NULL;
+    compiler->type = type;
     compiler->loop = NULL;
     compiler->localCount = 0;
     compiler->scopeDepth = 0;
+    compiler->function = newFunction(compiler->parser->vm);
     compiler->parser->vm->compiler = compiler;
+
+    if (type != TYPE_MAIN)
+    {
+        compiler->function->name = newStringLength(
+            compiler->parser->vm,
+            compiler->parser->previous.lexeme,
+            compiler->parser->previous.length
+        );
+    }
+
+    Local *local = &compiler->locals[compiler->localCount++];
+    local->depth = 0;
+    local->name.lexeme = "";
+    local->name.length = 0;
 }
 
 static Chunk *currentChunk(Compiler *compiler)
 {
-    return compiler->chunk;
+    return &compiler->function->chunk;
 }
 
 static void emitByte(Compiler *compiler, uint8_t byte)
@@ -237,19 +261,27 @@ static void emitLoop(Compiler *compiler, int loopStart)
 
 static void emitReturn(Compiler *compiler)
 {
+    emitByte(compiler, OP_NIL);
     emitByte(compiler, OP_RETURN);
 }
 
-static void endCompiler(Compiler *compiler)
+static ObjFn *endCompiler(Compiler *compiler)
 {
     emitReturn(compiler);
+    ObjFn *function = compiler->function;
 
     #if DUMP_CHUNK
         if (!compiler->parser->hadError)
-            { disassemble(currentChunk(compiler), "Code"); }
+        {
+            disassemble(
+                currentChunk(compiler),
+                function->name != NULL ? function->name->value : "main"
+            );
+        }
     #endif
 
     compiler->parser->vm->compiler = compiler->enclosing;
+    return function;
 }
 
 static uint8_t identifierConstant(Compiler *compiler, Token *name)
@@ -383,6 +415,33 @@ static void unary(Compiler *compiler, bool canAssign)
     }
 }
 
+static uint8_t argumentList(Compiler *compiler)
+{
+    uint8_t argc = 0;
+    if (!check(compiler, TK_RPAREN))
+    {
+        do
+        {
+            expression(compiler);
+            if (argc == 255)
+            {
+                error(compiler, "Cannot have more than 255 arguments to a call expression");
+            }
+
+            argc++;
+        } while (match(compiler, TK_COMMA));
+    }
+
+    consume(compiler, TK_RPAREN, "Expected ')' after arguments");
+    return argc;
+}
+
+static void call(Compiler *compiler, bool canAssign)
+{
+    uint8_t argc = argumentList(compiler);
+    emitBytes(compiler, OP_CALL, argc);
+}
+
 static void grouping(Compiler *compiler, bool canAssign)
 {
     expression(compiler);
@@ -461,7 +520,7 @@ static void variable(Compiler *compiler, bool canAssign)
 ParseRule rules[] = {
     [TK_ERROR]          = UNUSED,
     [TK_EOF]            = UNUSED,
-    [TK_LPAREN]         = MIXFIX(grouping, NULL, PREC_CALL),
+    [TK_LPAREN]         = MIXFIX(grouping, call, PREC_CALL),
     [TK_RPAREN]         = UNUSED,
     [TK_LBRACE]         = UNUSED,
     [TK_RBRACE]         = UNUSED,
@@ -759,6 +818,25 @@ static void printStatement(Compiler *compiler)
     emitByte(compiler, OP_PRINT);
 }
 
+static void returnStatement(Compiler *compiler)
+{
+    if (compiler->type == TYPE_MAIN)
+    {
+        error(compiler, "Cannot return from top-level code");
+    }
+
+    if (match(compiler, TK_SEMICOLON))
+    {
+        emitReturn(compiler);
+    }
+    else
+    {
+        expression(compiler);
+        consume(compiler, TK_SEMICOLON, "Expected ';' after return value");
+        emitByte(compiler, OP_RETURN);
+    }
+}
+
 static void whileStatement(Compiler *compiler)
 {
     Loop loop;
@@ -797,6 +875,10 @@ static void statement(Compiler *compiler)
     else if (match(compiler, TK_PRINT))
     {
         printStatement(compiler);
+    }
+    else if (match(compiler, TK_RETURN))
+    {
+        returnStatement(compiler);
     }
     else if (match(compiler, TK_WHILE))
     {
@@ -887,6 +969,44 @@ static void defineVariable(Compiler *compiler, uint8_t global)
     emitBytes(compiler, OP_DEFINE_GLOBAL, global);
 }
 
+static void funDefinition(Compiler *parent, FunctionType type)
+{
+    Compiler compiler;
+    initCompiler(&compiler, parent->parser, parent, type);
+    beginScope(&compiler);
+
+    consume(&compiler, TK_LPAREN, "Expected '(' after function name");
+    if (!check(&compiler, TK_RPAREN))
+    {
+        do
+        {
+            compiler.function->arity++;
+            if (compiler.function->arity > 255)
+            {
+                errorAtCurrent(&compiler, "Cannot have more than 255 parameters to a function");
+            }
+
+            uint8_t constant = parseVariable(&compiler, "Expected parameter name");
+            defineVariable(&compiler, constant);
+        } while (match(&compiler, TK_COMMA));
+    }
+
+    consume(&compiler, TK_RPAREN, "Expected ')' after function parameters");
+    consume(&compiler, TK_LBRACE, "Expected '{' before function body");
+    block(&compiler);
+
+    ObjFn *function = endCompiler(&compiler);
+    emitBytes(compiler.enclosing, OP_CONSTANT, makeConstant(compiler.enclosing, OBJ_VAL(function)));
+}
+
+static void funDeclaration(Compiler *compiler)
+{
+    uint8_t global = parseVariable(compiler, "Expected function name");
+    markInitialized(compiler);
+    funDefinition(compiler, TYPE_FUNCTION);
+    defineVariable(compiler, global);
+}
+
 static void varDeclaration(Compiler *compiler)
 {
     uint8_t global = parseVariable(compiler, "Expected variable name");
@@ -906,7 +1026,11 @@ static void varDeclaration(Compiler *compiler)
 
 static void declaration(Compiler *compiler)
 {
-    if (match(compiler, TK_VAR))
+    if (match(compiler, TK_FUN))
+    {
+        funDeclaration(compiler);
+    }
+    else if (match(compiler, TK_VAR))
         { varDeclaration(compiler); }
     else
         { statement(compiler); }
@@ -914,7 +1038,7 @@ static void declaration(Compiler *compiler)
     if (compiler->parser->panicMode) synchronize(compiler);
 }
 
-bool compile(LoxVM *vm, Chunk *chunk, const char *source)
+ObjFn *compile(LoxVM *vm, const char *source)
 {
     #if DUMP_TOKENS
         dumpTokens(source);
@@ -927,8 +1051,7 @@ bool compile(LoxVM *vm, Chunk *chunk, const char *source)
     initParser(&parser, &lexer, vm);
 
     Compiler compiler;
-    initCompiler(&compiler, NULL, &parser);
-    compiler.chunk = chunk;
+    initCompiler(&compiler, &parser, NULL, TYPE_MAIN);
 
     advance(&compiler);
     while (!match(&compiler, TK_EOF))
@@ -936,7 +1059,6 @@ bool compile(LoxVM *vm, Chunk *chunk, const char *source)
         declaration(&compiler);
     }
 
-    endCompiler(&compiler);
-
-    return !compiler.parser->hadError;
+    ObjFn *function = endCompiler(&compiler);
+    return compiler.parser->hadError ? NULL : function;
 }

@@ -1,7 +1,8 @@
 #ifndef lox_chunk_h
 #define lox_chunk_h
 
-#include "arrays.h"
+#include "utils.h"
+#include "value.h"
 
 typedef enum
 {
@@ -31,6 +32,7 @@ typedef enum
     // Byte Instructions (2 bytes)
     OP_GET_LOCAL,
     OP_SET_LOCAL,
+    OP_CALL,
 
     // Jump Instructions (3 bytes)
     OP_JUMP,
@@ -43,18 +45,5 @@ typedef enum
     // Count
     OP_COUNT,
 } OpCode;
-
-typedef struct
-{
-    ByteArray code;
-    LineArray lines;
-    ValueArray constants;
-} Chunk;
-
-void initChunk(Chunk *chunk);
-void freeChunk(Chunk *chunk);
-void writeChunk(Chunk *chunk, uint8_t byte, int line);
-int addConstant(Chunk *chunk, Value value);
-int getLine(Chunk *chunk, int offset);
 
 #endif // lox_chunk_h

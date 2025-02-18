@@ -3,3 +3,6 @@ build/
 
 # Scratch Files
 scratch*
+
+# Backup files
+backup/

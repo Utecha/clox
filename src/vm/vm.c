@@ -5,11 +5,13 @@
 #include "compiler.h"
 #include "debug.h"
 #include "memory.h"
+#include "natives.h"
 #include "vm.h"
 
 static void resetStack(LoxVM *vm)
 {
     vm->stackTop = vm->stack;
+    vm->frameCount = 0;
 }
 
 static void runtimeError(LoxVM *vm, const char *fmt, ...)
@@ -22,9 +24,18 @@ static void runtimeError(LoxVM *vm, const char *fmt, ...)
     va_end(args);
     fputs("\n", stderr);
 
-    int instruction = (int)(vm->ip - vm->chunk->code.data - 1);
-    int line = getLine(vm->chunk, instruction);
-    fprintf(stderr, "[line %d] in script\n", line);
+    for (int i = vm->frameCount - 1; i >= 0; i--)
+    {
+        CallFrame *frame = &vm->frames[i];
+        ObjFn *function = frame->function;
+        size_t instruction = frame->ip - frame->function->chunk.code.data - 1;
+        int line = getLine(&frame->function->chunk, (int)instruction);
+
+        fprintf(stderr, "[line %d] in ", line);
+        if (function->name == NULL) fprintf(stderr, "main\n");
+        else fprintf(stderr, "%s()\n", function->name->value);
+    }
+
     resetStack(vm);
 }
 
@@ -35,6 +46,7 @@ void initVM(LoxVM *vm)
     tableInit(&vm->strings);
     tableInit(&vm->globals);
     vm->compiler = NULL;
+    defineNatives(vm);
 }
 
 void freeVM(LoxVM *vm)
@@ -74,12 +86,69 @@ static void concatenate(LoxVM *vm)
     pushVM(vm, OBJ_VAL(result));
 }
 
+static bool call(LoxVM *vm, ObjFn *function, int argc)
+{
+    if (argc != function->arity)
+    {
+        runtimeError(vm, "Expected %d arguments but got %d instead", function->arity, argc);
+        return false;
+    }
+
+    if (vm->frameCount == FRAMES_MAX)
+    {
+        runtimeError(vm, "Stack overflow");
+        return false;
+    }
+
+    CallFrame *frame = &vm->frames[vm->frameCount++];
+    frame->function = function;
+    frame->ip = function->chunk.code.data;
+    frame->slots = vm->stackTop - argc - 1;
+    return true;
+}
+
+static bool callValue(LoxVM *vm, Value callee, int argc)
+{
+    if (IS_OBJ(callee))
+    {
+        switch (OBJ_TYPE(callee))
+        {
+            case OBJ_FUNCTION:
+                return call(vm, AS_FUNCTION(callee), argc);
+            case OBJ_NATIVE:
+            {
+                ObjNative *native = AS_NATIVE(callee);
+                NativeFn nativeFn = AS_NATIVE_FN(callee);
+
+                if (argc != native->arity)
+                {
+                    runtimeError(vm, "Expected %d arguments but got %d instead", native->arity, argc);
+                    return false;
+                }
+
+                Value result = nativeFn(argc, vm->stackTop - argc);
+                vm->stackTop -= argc + 1;
+                pushVM(vm, result);
+                return true;
+            } break;
+            default:
+                break; // Non-callable object type
+        }
+    }
+
+    runtimeError(vm, "Can only call functions and classes");
+    return false;
+}
+
 static InterpretResult runInterpreter(LoxVM *vm)
 {
-    #define READ_BYTE()     (*vm->ip++)
-    #define READ_SHORT()    (vm->ip += 2, (uint16_t)((vm->ip[-2] << 8) | vm->ip[-1]))
-    #define READ_CONSTANT() (vm->chunk->constants.data[READ_BYTE()])
+    CallFrame *frame = &vm->frames[vm->frameCount - 1];
+
+    #define READ_BYTE()     (*frame->ip++)
+    #define READ_SHORT()    (frame->ip += 2, (uint16_t)((frame->ip[-2] << 8) | frame->ip[-1]))
+    #define READ_CONSTANT() (frame->function->chunk.constants.data[READ_BYTE()])
     #define READ_STRING()   AS_STRING(READ_CONSTANT())
+    #define LOAD_FRAME()    (frame = &vm->frames[vm->frameCount - 1])
     #define BINARY_OP(valueType, op)                                                \
         do                                                                          \
         {                                                                           \
@@ -104,7 +173,10 @@ static InterpretResult runInterpreter(LoxVM *vm)
                 printf(" ]");
             }
             printf("\n");
-            disassembleInstruction(vm->chunk, (int)(vm->ip - vm->chunk->code.data));
+            disassembleInstruction(
+                &frame->function->chunk,
+                (int)(frame->ip - frame->function->chunk.code.data)
+            );
         #endif
 
         uint8_t instruction;
@@ -175,7 +247,20 @@ static InterpretResult runInterpreter(LoxVM *vm)
                 BINARY_OP(BOOL_VAL, <);
                 break;
             case OP_RETURN:
-                return RESULT_OK;
+            {
+                Value result = popVM(vm);
+                vm->frameCount--;
+
+                if (vm->frameCount == 0)
+                {
+                    popVM(vm);
+                    return RESULT_OK;
+                }
+
+                vm->stackTop = frame->slots;
+                pushVM(vm, result);
+                LOAD_FRAME();
+            } break;
             case OP_PRINT:
             {
                 printValue(popVM(vm));
@@ -222,36 +307,45 @@ static InterpretResult runInterpreter(LoxVM *vm)
             case OP_GET_LOCAL:
             {
                 uint8_t slot = READ_BYTE();
-                pushVM(vm, vm->stack[slot]);
+                pushVM(vm, frame->slots[slot]);
             } break;
             case OP_SET_LOCAL:
             {
                 uint8_t slot = READ_BYTE();
-                vm->stack[slot] = peekVM(vm, 0);
+                frame->slots[slot] = peekVM(vm, 0);
+            } break;
+            case OP_CALL:
+            {
+                int argc = READ_BYTE();
+                if (!callValue(vm, peekVM(vm, argc), argc))
+                {
+                    return RESULT_RUNTIME_ERROR;
+                }
+                LOAD_FRAME();
             } break;
 
             /* Jump Instructions */
             case OP_JUMP:
             {
                 uint16_t offset = READ_SHORT();
-                vm->ip += offset;
+                frame->ip += offset;
             } break;
             case OP_JUMP_IF:
             {
                 uint16_t offset = READ_SHORT();
-                if (isFalsey(peekVM(vm, 0))) vm->ip += offset;
+                if (isFalsey(peekVM(vm, 0))) frame->ip += offset;
             } break;
             case OP_LOOP:
             {
                 uint16_t offset = READ_SHORT();
-                vm->ip -= offset;
+                frame->ip -= offset;
             } break;
             case OP_AND:
             {
                 uint16_t offset = READ_SHORT();
                 Value condition = peekVM(vm, 0);
 
-                if (isFalsey(condition)) vm->ip += offset;
+                if (isFalsey(condition)) frame->ip += offset;
                 else popVM(vm);
             } break;
             case OP_OR:
@@ -260,12 +354,13 @@ static InterpretResult runInterpreter(LoxVM *vm)
                 Value condition = peekVM(vm, 0);
 
                 if (isFalsey(condition)) popVM(vm);
-                else vm->ip += offset;
+                else frame->ip += offset;
             } break;
         }
     }
 
     #undef BINARY_OP
+    #undef LOAD_FRAME
     #undef READ_STRING
     #undef READ_CONSTANT
     #undef READ_SHORT
@@ -274,19 +369,11 @@ static InterpretResult runInterpreter(LoxVM *vm)
 
 InterpretResult interpret(LoxVM *vm, char *source)
 {
-    Chunk chunk;
-    initChunk(&chunk);
+    ObjFn *function = compile(vm, source);
+    if (function == NULL) return RESULT_COMPILE_ERROR;
 
-    if (!compile(vm, &chunk, source))
-    {
-        freeChunk(&chunk);
-        return RESULT_COMPILE_ERROR;
-    }
+    pushVM(vm, OBJ_VAL(function));
+    call(vm, function, 0);
 
-    vm->chunk = &chunk;
-    vm->ip = vm->chunk->code.data;
-
-    InterpretResult result = runInterpreter(vm);
-    freeChunk(&chunk);
-    return result;
+    return runInterpreter(vm);
 }

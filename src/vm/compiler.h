@@ -4,6 +4,6 @@
 #include "common.h"
 #include "vm.h"
 
-bool compile(LoxVM *vm, Chunk *chunk, const char *source);
+ObjFn *compile(LoxVM *vm, const char *source);
 
 #endif // lox_compiler_h

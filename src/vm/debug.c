@@ -30,6 +30,7 @@ const char *opcodes[OP_COUNT] = {
     // Byte Instructions (2 bytes)
     [OP_GET_LOCAL]      = "GET LOCAL",
     [OP_SET_LOCAL]      = "SET LOCAL",
+    [OP_CALL]           = "CALL",
 
     // Jump Instructions (3 bytes)
     [OP_JUMP]           = "JUMP",
@@ -158,14 +159,18 @@ int disassembleInstruction(Chunk *chunk, int offset)
         case OP_RETURN:
         case OP_PRINT:
             return simpleInstruction(name, offset);
+
         case OP_CONSTANT:
         case OP_DEFINE_GLOBAL:
         case OP_GET_GLOBAL:
         case OP_SET_GLOBAL:
             return constantInstruction(name, chunk, offset);
+
         case OP_GET_LOCAL:
         case OP_SET_LOCAL:
+        case OP_CALL:
             return byteInstruction(name, chunk, offset);
+
         case OP_JUMP:
         case OP_JUMP_IF:
         case OP_AND:
@@ -174,6 +179,7 @@ int disassembleInstruction(Chunk *chunk, int offset)
             return jumpInstruction(name, 1, chunk, offset);
         case OP_LOOP:
             return jumpInstruction(name, -1, chunk, offset);
+
         default:
             printf("Unknown OpCode: %d", instruction);
             return offset + 1;
