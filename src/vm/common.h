@@ -38,7 +38,7 @@ typedef struct Table Table;
     * The result of all of that is dumped to the standard
     * error stream.
     */
-    #define TRACE_INSTRUCTIONS 1
+    #define TRACE_INSTRUCTIONS 0
 
     /*
     * If enabled, outputs data about objects being allocated,

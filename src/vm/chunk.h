@@ -38,6 +38,7 @@ typedef enum
     OP_LOOP,
     OP_AND,
     OP_OR,
+    OP_END,
 
     // Count
     OP_COUNT,

@@ -49,8 +49,10 @@ typedef enum
 
     /* Keyword */
     TK_AND,
+    TK_BREAK,
     TK_CLASS,
     TK_CONST,
+    TK_CONTINUE,
     TK_ELSE,
     TK_FALSE,
     TK_FOR,

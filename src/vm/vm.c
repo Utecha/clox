@@ -242,7 +242,10 @@ static InterpretResult runInterpreter(LoxVM *vm)
                 if (isFalsey(peekVM(vm, 0))) vm->ip += offset;
             } break;
             case OP_LOOP:
-                break;
+            {
+                uint16_t offset = READ_SHORT();
+                vm->ip -= offset;
+            } break;
             case OP_AND:
             {
                 uint16_t offset = READ_SHORT();

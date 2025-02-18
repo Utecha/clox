@@ -55,11 +55,21 @@ typedef struct
     bool isConst;
 } Local;
 
+typedef struct Loop
+{
+    int start;
+    int exit;
+    int body;
+    int scopeDepth;
+    struct Loop *enclosing;
+} Loop;
+
 struct Compiler
 {
     Parser *parser;
     Chunk *chunk;
     Compiler *enclosing;
+    Loop *loop;
     Local locals[MAX_LOCALS];
     int localCount;
     int scopeDepth;
@@ -149,6 +159,7 @@ static void initCompiler(Compiler *compiler, Compiler *enclosing, Parser *parser
 {
     compiler->parser = parser;
     compiler->enclosing = enclosing;
+    compiler->loop = NULL;
     compiler->localCount = 0;
     compiler->scopeDepth = 0;
     compiler->parser->vm->compiler = compiler;
@@ -168,6 +179,11 @@ static void emitBytes(Compiler *compiler, uint8_t byte1, uint8_t byte2)
 {
     emitByte(compiler, byte1);
     emitByte(compiler, byte2);
+}
+
+static void emitShort(Compiler *compiler, int arg)
+{
+    emitBytes(compiler, (arg >> 8) & 0xff, arg & 0xff);
 }
 
 static uint8_t makeConstant(Compiler *compiler, Value value)
@@ -190,8 +206,7 @@ static void emitConstant(Compiler *compiler, Value value)
 static int emitJump(Compiler *compiler, uint8_t instruction)
 {
     emitByte(compiler, instruction);
-    emitByte(compiler, 0xff);
-    emitByte(compiler, 0xff);
+    emitBytes(compiler, 0xff, 0xff);
     return currentChunk(compiler)->code.count - 2;
 }
 
@@ -207,6 +222,18 @@ static void patchJump(Compiler *compiler, int offset)
     currentChunk(compiler)->code.data[offset + 1] = jump & 0xff;
 }
 
+static void emitLoop(Compiler *compiler, int loopStart)
+{
+    emitByte(compiler, OP_LOOP);
+
+    int offset = currentChunk(compiler)->code.count - loopStart + 2;
+    if (offset > MAX_JUMP) error(compiler, "Loop body is too large");
+
+    emitShort(compiler, offset);
+    // emitByte(compiler, (offset >> 8) & 0xff);
+    // emitByte(compiler, offset & 0xff);
+}
+
 static void emitReturn(Compiler *compiler)
 {
     emitByte(compiler, OP_RETURN);
@@ -220,6 +247,8 @@ static void endCompiler(Compiler *compiler)
         if (!compiler->parser->hadError)
             { disassemble(currentChunk(compiler), "Code"); }
     #endif
+
+    compiler->parser->vm->compiler = compiler->enclosing;
 }
 
 static uint8_t identifierConstant(Compiler *compiler, Token *name)
@@ -268,6 +297,18 @@ static int resolveLocal(Compiler *compiler, Token *name)
     return -1;
 }
 
+static int discardLocals(Compiler *compiler, int depth)
+{
+    int local = compiler->localCount - 1;
+    while (local >= 0 && compiler->locals[local].depth >= depth)
+    {
+        emitByte(compiler, OP_POP);
+        local--;
+    }
+
+    return compiler->localCount - local - 1;
+}
+
 static void beginScope(Compiler *compiler)
 {
     compiler->scopeDepth++;
@@ -275,14 +316,9 @@ static void beginScope(Compiler *compiler)
 
 static void endScope(Compiler *compiler)
 {
+    int popped = discardLocals(compiler, compiler->scopeDepth);
+    compiler->localCount -= popped;
     compiler->scopeDepth--;
-
-    while (compiler->localCount > 0 &&
-           compiler->locals[compiler->localCount - 1].depth > compiler->scopeDepth)
-    {
-        emitByte(compiler, OP_POP);
-        compiler->localCount--;
-    }
 }
 
 static void conditional(Compiler *compiler, bool canAssign)
@@ -449,8 +485,10 @@ ParseRule rules[] = {
     [TK_NUMBER]         = PREFIX(number),
     [TK_STRING]         = PREFIX(string),
     [TK_AND]            = MIXFIX(NULL, and, PREC_AND),
+    [TK_BREAK]          = UNUSED,
     [TK_CLASS]          = UNUSED,
     [TK_CONST]          = UNUSED,
+    [TK_CONTINUE]       = UNUSED,
     [TK_ELSE]           = UNUSED,
     [TK_FALSE]          = PREFIX(literal),
     [TK_FOR]            = UNUSED,
@@ -503,12 +541,122 @@ static void expression(Compiler *compiler)
     parsePrecedence(compiler, PREC_ASSIGNMENT);
 }
 
+static void startLoop(Compiler *compiler, Loop *loop)
+{
+    loop->enclosing = compiler->loop;
+    loop->start = currentChunk(compiler)->code.count;
+    loop->scopeDepth = compiler->scopeDepth;
+    compiler->loop = loop;
+}
+
+static void loopBody(Compiler *compiler)
+{
+    compiler->loop->body = currentChunk(compiler)->code.count;
+    statement(compiler);
+}
+
+static void testLoopExit(Compiler *compiler)
+{
+    compiler->loop->exit = emitJump(compiler, OP_JUMP_IF);
+}
+
+static int getByteCount(const uint8_t *code, const Value *constants, int ip)
+{
+    switch (code[ip])
+    {
+        // Simple Instructions (1 byte)
+        case OP_NIL:
+        case OP_FALSE:
+        case OP_TRUE:
+        case OP_POP:
+        case OP_NEGATE:
+        case OP_NOT:
+        case OP_ADD:
+        case OP_SUBTRACT:
+        case OP_MULTIPLY:
+        case OP_DIVIDE:
+        case OP_EQUAL:
+        case OP_GREATER:
+        case OP_LESS:
+        case OP_RETURN:
+        case OP_PRINT:
+        case OP_END:
+            return 0;
+
+        case OP_CONSTANT:
+        case OP_DEFINE_GLOBAL:
+        case OP_GET_GLOBAL:
+        case OP_SET_GLOBAL:
+        case OP_GET_LOCAL:
+        case OP_SET_LOCAL:
+            return 1;
+
+        case OP_JUMP:
+        case OP_JUMP_IF:
+        case OP_LOOP:
+        case OP_AND:
+        case OP_OR:
+            return 2;
+    }
+
+    return -1;
+}
+
+static void endLoop(Compiler *compiler)
+{
+    patchJump(compiler, compiler->loop->exit);
+    emitByte(compiler, OP_POP);
+
+    int i = compiler->loop->body;
+    while (i < currentChunk(compiler)->code.count)
+    {
+        if (currentChunk(compiler)->code.data[i] == OP_END)
+        {
+            currentChunk(compiler)->code.data[i] = OP_JUMP;
+            patchJump(compiler, i + 1);
+            i += 3;
+        }
+        else
+        {
+            i += 1 + getByteCount(currentChunk(compiler)->code.data, currentChunk(compiler)->constants.data, i);
+        }
+    }
+
+    compiler->loop = compiler->loop->enclosing;
+}
+
 static void block(Compiler *compiler)
 {
     while (!check(compiler, TK_RBRACE) && !check(compiler, TK_EOF))
         { declaration(compiler); }
 
     consume(compiler, TK_RBRACE, "Expected '}' after block");
+}
+
+static void breakStatement(Compiler *compiler)
+{
+    if (compiler->loop == NULL)
+    {
+        error(compiler, "Cannot use 'break' outside of a loop");
+        return;
+    }
+
+    consume(compiler, TK_SEMICOLON, "Expected ';' after 'break'");
+    discardLocals(compiler, compiler->loop->scopeDepth + 1);
+    emitJump(compiler, OP_END);
+}
+
+static void continueStatement(Compiler *compiler)
+{
+    if (compiler->loop == NULL)
+    {
+        error(compiler, "Cannot use 'continue' outside of a loop");
+        return;
+    }
+
+    consume(compiler, TK_SEMICOLON, "Expected ';' after 'continue'");
+    discardLocals(compiler, compiler->loop->scopeDepth + 1);
+    emitLoop(compiler, compiler->loop->start);
 }
 
 static void expressionStatement(Compiler *compiler)
@@ -543,15 +691,56 @@ static void printStatement(Compiler *compiler)
     emitByte(compiler, OP_PRINT);
 }
 
+static void whileStatement(Compiler *compiler)
+{
+    Loop loop;
+    startLoop(compiler, &loop);
+
+    // consume(compiler, TK_LPAREN, "Expected '(' after 'while'");
+    expression(compiler);
+    // consume(compiler, TK_RPAREN, "Expected ')' after 'while' condition");
+
+    testLoopExit(compiler);
+    emitByte(compiler, OP_POP);
+    loopBody(compiler);
+    emitLoop(compiler, loop.start);
+    endLoop(compiler);
+    // int loopStart = currentChunk(compiler)->code.count;
+
+    // consume(compiler, TK_LPAREN, "Expected '(' after 'while'");
+    // expression(compiler);
+    // consume(compiler, TK_RPAREN, "Expected ')' after 'while' condition");
+
+    // int exitJump = emitJump(compiler, OP_JUMP_IF);
+    // emitByte(compiler, OP_POP);
+    // statement(compiler);
+    // emitLoop(compiler, loopStart);
+
+    // patchJump(compiler, exitJump);
+    // emitByte(compiler, OP_POP);
+}
+
 static void statement(Compiler *compiler)
 {
-    if (match(compiler, TK_IF))
+    if (match(compiler, TK_BREAK))
+    {
+        breakStatement(compiler);
+    }
+    else if (match(compiler, TK_CONTINUE))
+    {
+        continueStatement(compiler);
+    }
+    else if (match(compiler, TK_IF))
     {
         ifStatement(compiler);
     }
     else if (match(compiler, TK_PRINT))
     {
         printStatement(compiler);
+    }
+    else if (match(compiler, TK_WHILE))
+    {
+        whileStatement(compiler);
     }
     else if (match(compiler, TK_LBRACE))
     {

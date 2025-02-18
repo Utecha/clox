@@ -37,6 +37,7 @@ const char *opcodes[OP_COUNT] = {
     [OP_LOOP]           = "LOOP",
     [OP_AND]            = "AND",
     [OP_OR]             = "OR",
+    [OP_END]            = "END",
 };
 
 const char *tokenTypes[TK_COUNT] = {
@@ -67,8 +68,10 @@ const char *tokenTypes[TK_COUNT] = {
     [TK_NUMBER]     = "NUMBER",
     [TK_STRING]     = "STRING",
     [TK_AND]        = "AND",
+    [TK_BREAK]      = "BREAK",
     [TK_CLASS]      = "CLASS",
     [TK_CONST]      = "CONST",
+    [TK_CONTINUE]   = "CONTINUE",
     [TK_ELSE]       = "ELSE",
     [TK_FALSE]      = "FALSE",
     [TK_FOR]        = "FOR",
@@ -167,6 +170,7 @@ int disassembleInstruction(Chunk *chunk, int offset)
         case OP_JUMP_IF:
         case OP_AND:
         case OP_OR:
+        case OP_END:
             return jumpInstruction(name, 1, chunk, offset);
         case OP_LOOP:
             return jumpInstruction(name, -1, chunk, offset);

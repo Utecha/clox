@@ -11,8 +11,10 @@ typedef struct
 
 static Keyword keywords[] = {
     { "and", 3, TK_AND },
+    { "break", 5, TK_BREAK },
     { "class", 5, TK_CLASS },
     { "const", 5, TK_CONST },
+    { "continue", 8, TK_CONTINUE },
     { "else", 4, TK_ELSE },
     { "false", 5, TK_FALSE },
     { "for", 3, TK_FOR },
