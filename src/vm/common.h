@@ -20,7 +20,7 @@ typedef struct Table Table;
     * If enabled, the VM will disassemble and dump an entire
     * compiled bytecode chunk to the standard error stream.
     */
-    #define DUMP_CHUNK 0
+    #define DUMP_CHUNK 1
 
     /*
     * If enabled, the execution of the compiler itself will
@@ -38,7 +38,7 @@ typedef struct Table Table;
     * The result of all of that is dumped to the standard
     * error stream.
     */
-    #define TRACE_INSTRUCTIONS 1
+    #define TRACE_INSTRUCTIONS 0
 
     /*
     * If enabled, outputs data about objects being allocated,

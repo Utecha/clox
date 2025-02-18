@@ -50,6 +50,7 @@ typedef enum
     /* Keyword */
     TK_AND,
     TK_CLASS,
+    TK_CONST,
     TK_ELSE,
     TK_FALSE,
     TK_FOR,

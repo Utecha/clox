@@ -109,6 +109,7 @@ static InterpretResult runInterpreter(LoxVM *vm)
         uint8_t instruction;
         switch (instruction = READ_BYTE())
         {
+            /* Simple Instructions */
             case OP_NIL:
                 pushVM(vm, NIL_VAL);
                 break;
@@ -179,6 +180,8 @@ static InterpretResult runInterpreter(LoxVM *vm)
                 printValue(popVM(vm));
                 printf("\n");
             } break;
+
+            /* Constant Instructions */
             case OP_CONSTANT:
             {
                 Value constant = READ_CONSTANT();
@@ -212,6 +215,18 @@ static InterpretResult runInterpreter(LoxVM *vm)
                     runtimeError(vm, "Undefined variable '%s'", name->value);
                     return RESULT_RUNTIME_ERROR;
                 }
+            } break;
+
+            /* Byte Instructions */
+            case OP_GET_LOCAL:
+            {
+                uint8_t slot = READ_BYTE();
+                pushVM(vm, vm->stack[slot]);
+            } break;
+            case OP_SET_LOCAL:
+            {
+                uint8_t slot = READ_BYTE();
+                vm->stack[slot] = peekVM(vm, 0);
             } break;
         }
     }

@@ -1,5 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+
 #include "compiler.h"
 #include "lexer.h"
 #include "vm.h"
@@ -7,6 +9,8 @@
 #if DUMP_TOKENS || DUMP_CHUNK
     #include "debug.h"
 #endif
+
+#define MAX_LOCALS 256
 
 typedef enum
 {
@@ -43,12 +47,31 @@ typedef struct
     bool panicMode;
 } Parser;
 
+typedef struct
+{
+    Token name;
+    int depth;
+    bool isConst;
+} Local;
+
 struct Compiler
 {
     Parser *parser;
     Chunk *chunk;
+    Compiler *enclosing;
+    Local locals[MAX_LOCALS];
+    int localCount;
+    int scopeDepth;
 };
 
+/* Forward Declarations */
+static ParseRule *getRule(TokenType type);
+static void parsePrecedence(Compiler *compiler, Precedence precedence);
+static void expression(Compiler *compiler);
+static void statement(Compiler *compiler);
+static void declaration(Compiler *compiler);
+
+// Parser ----------------------------------------------------------------------
 static void initParser(Parser *parser, Lexer *lexer, LoxVM *vm)
 {
     parser->vm = vm;
@@ -120,14 +143,19 @@ static bool match(Compiler *compiler, TokenType type)
     return true;
 }
 
+// Compiler --------------------------------------------------------------------
+static void initCompiler(Compiler *compiler, Compiler *enclosing, Parser *parser)
+{
+    compiler->parser = parser;
+    compiler->enclosing = enclosing;
+    compiler->localCount = 0;
+    compiler->scopeDepth = 0;
+    compiler->parser->vm->compiler = compiler;
+}
+
 static Chunk *currentChunk(Compiler *compiler)
 {
     return compiler->chunk;
-}
-
-static void initCompiler(Compiler *compiler, Parser *parser)
-{
-    compiler->parser = parser;
 }
 
 static void emitByte(Compiler *compiler, uint8_t byte)
@@ -158,14 +186,6 @@ static void emitConstant(Compiler *compiler, Value value)
     emitBytes(compiler, OP_CONSTANT, makeConstant(compiler, value));
 }
 
-static uint8_t identifierConstant(Compiler *compiler, Token *name)
-{
-    return makeConstant(
-        compiler,
-        OBJ_VAL(newStringLength(compiler->parser->vm, name->lexeme, name->length))
-    );
-}
-
 static void emitReturn(Compiler *compiler)
 {
     emitByte(compiler, OP_RETURN);
@@ -176,15 +196,73 @@ static void endCompiler(Compiler *compiler)
     emitReturn(compiler);
 
     #if DUMP_CHUNK
-        if (!compiler->parser.hadError)
+        if (!compiler->parser->hadError)
             { disassemble(currentChunk(compiler), "Code"); }
     #endif
 }
 
-/* Forward Declarations */
-static ParseRule *getRule(TokenType type);
-static void parsePrecedence(Compiler *compiler, Precedence precedence);
-static void expression(Compiler *compiler);
+static uint8_t identifierConstant(Compiler *compiler, Token *name)
+{
+    return makeConstant(
+        compiler,
+        OBJ_VAL(newStringLength(compiler->parser->vm, name->lexeme, name->length))
+    );
+}
+
+static bool identifiersEqual(Token *a, Token *b)
+{
+    if (a->length != b->length) return false;
+    return memcmp(a->lexeme, b->lexeme, a->length) == 0;
+}
+
+static void addLocal(Compiler *compiler, Token name)
+{
+    if (compiler->localCount == MAX_LOCALS)
+    {
+        error(compiler, "Too many local variables in function");
+        return;
+    }
+
+    Local *local = &compiler->locals[compiler->localCount++];
+    local->name = name;
+    local->depth = -1;
+}
+
+static int resolveLocal(Compiler *compiler, Token *name)
+{
+    for (int i = compiler->localCount - 1; i >= 0; i--)
+    {
+        Local *local = &compiler->locals[i];
+        if (identifiersEqual(name, &local->name))
+        {
+            if (local->depth == -1)
+            {
+                error(compiler, "Cannot read a local variable within its own initializer");
+            }
+
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+static void beginScope(Compiler *compiler)
+{
+    compiler->scopeDepth++;
+}
+
+static void endScope(Compiler *compiler)
+{
+    compiler->scopeDepth--;
+
+    while (compiler->localCount > 0 &&
+           compiler->locals[compiler->localCount - 1].depth > compiler->scopeDepth)
+    {
+        emitByte(compiler, OP_POP);
+        compiler->localCount--;
+    }
+}
 
 static void conditional(Compiler *compiler, bool canAssign)
 {
@@ -271,16 +349,29 @@ static void literal(Compiler *compiler, bool canAssign)
 
 static void namedVariable(Compiler *compiler, Token name, bool canAssign)
 {
-    uint8_t arg = identifierConstant(compiler, &name);
+    uint8_t getOp, setOp;
+    int arg = resolveLocal(compiler, &name);
+
+    if (arg != -1)
+    {
+        getOp = OP_GET_LOCAL;
+        setOp = OP_SET_LOCAL;
+    }
+    else
+    {
+        arg = identifierConstant(compiler, &name);
+        getOp = OP_GET_GLOBAL;
+        setOp = OP_SET_GLOBAL;
+    }
 
     if (canAssign && match(compiler, TK_EQUAL))
     {
         expression(compiler);
-        emitBytes(compiler, OP_SET_GLOBAL, arg);
+        emitBytes(compiler, setOp, (uint8_t)arg);
     }
     else
     {
-        emitBytes(compiler, OP_GET_GLOBAL, arg);
+        emitBytes(compiler, getOp, (uint8_t)arg);
     }
 }
 
@@ -323,6 +414,7 @@ ParseRule rules[] = {
     [TK_STRING]         = PREFIX(string),
     [TK_AND]            = UNUSED,
     [TK_CLASS]          = UNUSED,
+    [TK_CONST]          = UNUSED,
     [TK_ELSE]           = UNUSED,
     [TK_FALSE]          = PREFIX(literal),
     [TK_FOR]            = UNUSED,
@@ -375,6 +467,14 @@ static void expression(Compiler *compiler)
     parsePrecedence(compiler, PREC_ASSIGNMENT);
 }
 
+static void block(Compiler *compiler)
+{
+    while (!check(compiler, TK_RBRACE) && !check(compiler, TK_EOF))
+        { declaration(compiler); }
+
+    consume(compiler, TK_RBRACE, "Expected '}' after block");
+}
+
 static void expressionStatement(Compiler *compiler)
 {
     expression(compiler);
@@ -392,9 +492,19 @@ static void printStatement(Compiler *compiler)
 static void statement(Compiler *compiler)
 {
     if (match(compiler, TK_PRINT))
-        { printStatement(compiler); }
+    {
+        printStatement(compiler);
+    }
+    else if (match(compiler, TK_LBRACE))
+    {
+        beginScope(compiler);
+        block(compiler);
+        endScope(compiler);
+    }
     else
-        { expressionStatement(compiler); }
+    {
+        expressionStatement(compiler);
+    }
 }
 
 static void synchronize(Compiler *compiler)
@@ -423,20 +533,57 @@ static void synchronize(Compiler *compiler)
     }
 }
 
+static void markInitialized(Compiler *compiler)
+{
+    if (compiler->scopeDepth == 0) return;
+    compiler->locals[compiler->localCount - 1].depth = compiler->scopeDepth;
+}
+
+static void declareVariable(Compiler *compiler)
+{
+    if (compiler->scopeDepth == 0) return;
+
+    Token *name = &compiler->parser->previous;
+    for (int i = compiler->localCount - 1; i >= 0; i--)
+    {
+        Local *local = &compiler->locals[i];
+        if (local->depth != -1 && local->depth < compiler->scopeDepth)
+        {
+            break;
+        }
+
+        if (identifiersEqual(name, &local->name))
+        {
+            error(compiler, "Already a variable with this name in this scope");
+        }
+    }
+
+    addLocal(compiler, *name);
+}
+
 static uint8_t parseVariable(Compiler *compiler, const char *message)
 {
     consume(compiler, TK_IDENTIFIER, message);
+    declareVariable(compiler);
+    if (compiler->scopeDepth > 0) return 0;
     return identifierConstant(compiler, &compiler->parser->previous);
 }
 
 static void defineVariable(Compiler *compiler, uint8_t global)
 {
+    if (compiler->scopeDepth > 0)
+    {
+        markInitialized(compiler);
+        return;
+    }
+
     emitBytes(compiler, OP_DEFINE_GLOBAL, global);
 }
 
 static void varDeclaration(Compiler *compiler)
 {
     uint8_t global = parseVariable(compiler, "Expected variable name");
+
     if (match(compiler, TK_EQUAL))
     {
         expression(compiler);
@@ -473,7 +620,7 @@ bool compile(LoxVM *vm, Chunk *chunk, const char *source)
     initParser(&parser, &lexer, vm);
 
     Compiler compiler;
-    initCompiler(&compiler, &parser);
+    initCompiler(&compiler, NULL, &parser);
     compiler.chunk = chunk;
 
     advance(&compiler);

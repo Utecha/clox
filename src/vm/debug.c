@@ -26,6 +26,10 @@ const char *opcodes[OP_COUNT] = {
     [OP_DEFINE_GLOBAL]  = "DEFINE GLOBAL",
     [OP_GET_GLOBAL]     = "GET GLOBAL",
     [OP_SET_GLOBAL]     = "SET GLOBAL",
+
+    // Byte Instructions (2 bytes)
+    [OP_GET_LOCAL]      = "GET LOCAL",
+    [OP_SET_LOCAL]      = "SET LOCAL",
 };
 
 const char *tokenTypes[TK_COUNT] = {
@@ -57,6 +61,7 @@ const char *tokenTypes[TK_COUNT] = {
     [TK_STRING]     = "STRING",
     [TK_AND]        = "AND",
     [TK_CLASS]      = "CLASS",
+    [TK_CONST]      = "CONST",
     [TK_ELSE]       = "ELSE",
     [TK_FALSE]      = "FALSE",
     [TK_FOR]        = "FOR",
@@ -79,6 +84,13 @@ static int constantInstruction(const char *name, Chunk *chunk, int offset)
     printf("%-14s %4d '", name, constant);
     printValue(chunk->constants.data[constant]);
     printf("'\n");
+    return offset + 2;
+}
+
+static int byteInstruction(const char *name, Chunk *chunk, int offset)
+{
+    uint8_t slot = chunk->code.data[offset + 1];
+    printf("%-14s %4d\n", name, slot);
     return offset + 2;
 }
 
@@ -133,6 +145,9 @@ int disassembleInstruction(Chunk *chunk, int offset)
         case OP_GET_GLOBAL:
         case OP_SET_GLOBAL:
             return constantInstruction(name, chunk, offset);
+        case OP_GET_LOCAL:
+        case OP_SET_LOCAL:
+            return byteInstruction(name, chunk, offset);
         default:
             printf("Unknown OpCode: %d", instruction);
             return offset + 1;
@@ -151,7 +166,7 @@ void dumpTokens(const char *source)
         printf("{ %s : %d }\n", tokenTypes[token.type], token.type);
         if (token.type == TK_EOF) break;
 
-        printf("Lexeme: %s\n", token.lexeme);
+        printf("Lexeme: %.*s\n", token.length, token.lexeme);
         printf("Length: %d\n", token.length);
         printf("Line: %d\n", token.line);
     }

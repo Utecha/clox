@@ -12,6 +12,7 @@ typedef struct
 static Keyword keywords[] = {
     { "and", 3, TK_AND },
     { "class", 5, TK_CLASS },
+    { "const", 5, TK_CONST },
     { "else", 4, TK_ELSE },
     { "false", 5, TK_FALSE },
     { "for", 3, TK_FOR },
@@ -218,7 +219,7 @@ Token getToken(Lexer *lexer)
         case '(':   return makeToken(lexer, TK_LPAREN);
         case ')':   return makeToken(lexer, TK_RPAREN);
         case '{':   return makeToken(lexer, TK_LBRACE);
-        case '}':   return makeToken(lexer, TK_LBRACE);
+        case '}':   return makeToken(lexer, TK_RBRACE);
         case ',':   return makeToken(lexer, TK_COMMA);
         case '.':   return makeToken(lexer, TK_DOT);
         case ';':   return makeToken(lexer, TK_SEMICOLON);
