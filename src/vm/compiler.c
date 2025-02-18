@@ -97,15 +97,27 @@ static void advance(Compiler *compiler)
     }
 }
 
+static bool check(Compiler *compiler, TokenType type)
+{
+    return compiler->parser->current.type == type;
+}
+
 static void consume(Compiler *compiler, TokenType type, const char *message)
 {
-    if (compiler->parser->current.type == type)
+    if (check(compiler, type))
     {
         advance(compiler);
         return;
     }
 
     errorAtCurrent(compiler, message);
+}
+
+static bool match(Compiler *compiler, TokenType type)
+{
+    if (!check(compiler, type)) return false;
+    advance(compiler);
+    return true;
 }
 
 static Chunk *currentChunk(Compiler *compiler)
@@ -144,6 +156,14 @@ static uint8_t makeConstant(Compiler *compiler, Value value)
 static void emitConstant(Compiler *compiler, Value value)
 {
     emitBytes(compiler, OP_CONSTANT, makeConstant(compiler, value));
+}
+
+static uint8_t identifierConstant(Compiler *compiler, Token *name)
+{
+    return makeConstant(
+        compiler,
+        OBJ_VAL(newStringLength(compiler->parser->vm, name->lexeme, name->length))
+    );
 }
 
 static void emitReturn(Compiler *compiler)
@@ -249,6 +269,26 @@ static void literal(Compiler *compiler, bool canAssign)
     }
 }
 
+static void namedVariable(Compiler *compiler, Token name, bool canAssign)
+{
+    uint8_t arg = identifierConstant(compiler, &name);
+
+    if (canAssign && match(compiler, TK_EQUAL))
+    {
+        expression(compiler);
+        emitBytes(compiler, OP_SET_GLOBAL, arg);
+    }
+    else
+    {
+        emitBytes(compiler, OP_GET_GLOBAL, arg);
+    }
+}
+
+static void variable(Compiler *compiler, bool canAssign)
+{
+    namedVariable(compiler, compiler->parser->previous, canAssign);
+}
+
 #define UNUSED                      { NULL, NULL, PREC_NONE }
 #define PREFIX(fn)                  { fn, NULL, PREC_NONE }
 #define INFIX(fn, prec)             { NULL, fn, prec }
@@ -278,7 +318,7 @@ ParseRule rules[] = {
     [TK_SLASH]          = INFIX(binary, PREC_FACTOR),
     [TK_STAR]           = INFIX(binary, PREC_FACTOR),
     [TK_BANG]           = PREFIX(unary),
-    [TK_IDENTIFIER]     = UNUSED,
+    [TK_IDENTIFIER]     = PREFIX(variable),
     [TK_NUMBER]         = PREFIX(number),
     [TK_STRING]         = PREFIX(string),
     [TK_AND]            = UNUSED,
@@ -323,11 +363,101 @@ static void parsePrecedence(Compiler *compiler, Precedence precedence)
         ParseFn infix = getRule(compiler->parser->previous.type)->infix;
         infix(compiler, canAssign);
     }
+
+    if (canAssign && match(compiler, TK_EQUAL))
+    {
+        error(compiler, "Invalid assignment target");
+    }
 }
 
 static void expression(Compiler *compiler)
 {
     parsePrecedence(compiler, PREC_ASSIGNMENT);
+}
+
+static void expressionStatement(Compiler *compiler)
+{
+    expression(compiler);
+    consume(compiler, TK_SEMICOLON, "Expected ';' after 'value'.");
+    emitByte(compiler, OP_POP);
+}
+
+static void printStatement(Compiler *compiler)
+{
+    expression(compiler);
+    consume(compiler, TK_SEMICOLON, "Expected ';' after 'value'.");
+    emitByte(compiler, OP_PRINT);
+}
+
+static void statement(Compiler *compiler)
+{
+    if (match(compiler, TK_PRINT))
+        { printStatement(compiler); }
+    else
+        { expressionStatement(compiler); }
+}
+
+static void synchronize(Compiler *compiler)
+{
+    Parser *parser = compiler->parser;
+    parser->panicMode = false;
+
+    while (parser->current.type != TK_EOF)
+    {
+        if (parser->previous.type == TK_SEMICOLON) return;
+        switch (parser->current.type)
+        {
+            case TK_CLASS:
+            case TK_FOR:
+            case TK_FUN:
+            case TK_IF:
+            case TK_PRINT:
+            case TK_RETURN:
+            case TK_WHILE:
+                return;
+            default:
+                ; // Do nothing
+        }
+
+        advance(compiler);
+    }
+}
+
+static uint8_t parseVariable(Compiler *compiler, const char *message)
+{
+    consume(compiler, TK_IDENTIFIER, message);
+    return identifierConstant(compiler, &compiler->parser->previous);
+}
+
+static void defineVariable(Compiler *compiler, uint8_t global)
+{
+    emitBytes(compiler, OP_DEFINE_GLOBAL, global);
+}
+
+static void varDeclaration(Compiler *compiler)
+{
+    uint8_t global = parseVariable(compiler, "Expected variable name");
+    if (match(compiler, TK_EQUAL))
+    {
+        expression(compiler);
+    }
+    else
+    {
+        emitByte(compiler, OP_NIL);
+    }
+
+    consume(compiler, TK_SEMICOLON, "Expected ';' after variable declaration");
+    defineVariable(compiler, global);
+}
+
+static void declaration(Compiler *compiler)
+{
+    if (match(compiler, TK_VAR))
+        { varDeclaration(compiler); }
+    else
+        { statement(compiler); }
+
+    if (compiler->parser->panicMode) synchronize(compiler);
 }
 
 bool compile(LoxVM *vm, Chunk *chunk, const char *source)
@@ -347,8 +477,11 @@ bool compile(LoxVM *vm, Chunk *chunk, const char *source)
     compiler.chunk = chunk;
 
     advance(&compiler);
-    expression(&compiler);
-    consume(&compiler, TK_EOF, "Expected end of expression");
+    while (!match(&compiler, TK_EOF))
+    {
+        declaration(&compiler);
+    }
+
     endCompiler(&compiler);
 
     return !compiler.parser->hadError;

@@ -33,10 +33,13 @@ void initVM(LoxVM *vm)
     resetStack(vm);
     vm->objects = NULL;
     tableInit(&vm->strings);
+    tableInit(&vm->globals);
+    vm->compiler = NULL;
 }
 
 void freeVM(LoxVM *vm)
 {
+    tableFree(&vm->globals);
     tableFree(&vm->strings);
     freeObjects(vm);
 }
@@ -75,6 +78,7 @@ static InterpretResult runInterpreter(LoxVM *vm)
 {
     #define READ_BYTE()     (*vm->ip++)
     #define READ_CONSTANT() (vm->chunk->constants.data[READ_BYTE()])
+    #define READ_STRING()   AS_STRING(READ_CONSTANT())
     #define BINARY_OP(valueType, op)                                                \
         do                                                                          \
         {                                                                           \
@@ -113,6 +117,9 @@ static InterpretResult runInterpreter(LoxVM *vm)
                 break;
             case OP_TRUE:
                 pushVM(vm, BOOL_VAL(true));
+                break;
+            case OP_POP:
+                popVM(vm);
                 break;
             case OP_NEGATE:
             {
@@ -166,20 +173,51 @@ static InterpretResult runInterpreter(LoxVM *vm)
                 BINARY_OP(BOOL_VAL, <);
                 break;
             case OP_RETURN:
+                return RESULT_OK;
+            case OP_PRINT:
             {
                 printValue(popVM(vm));
                 printf("\n");
-                return RESULT_OK;
-            }
+            } break;
             case OP_CONSTANT:
             {
                 Value constant = READ_CONSTANT();
                 pushVM(vm, constant);
             } break;
+            case OP_DEFINE_GLOBAL:
+            {
+                ObjString *name = READ_STRING();
+                tableSet(&vm->globals, name, peekVM(vm, 0));
+                popVM(vm);
+            } break;
+            case OP_GET_GLOBAL:
+            {
+                ObjString *name = READ_STRING();
+                Value value;
+
+                if (!tableGet(&vm->globals, name, &value))
+                {
+                    runtimeError(vm, "Undefined variable '%s'", name->value);
+                    return RESULT_RUNTIME_ERROR;
+                }
+
+                pushVM(vm, value);
+            } break;
+            case OP_SET_GLOBAL:
+            {
+                ObjString *name = READ_STRING();
+                if (tableSet(&vm->globals, name, peekVM(vm, 0)))
+                {
+                    tableDelete(&vm->globals, name);
+                    runtimeError(vm, "Undefined variable '%s'", name->value);
+                    return RESULT_RUNTIME_ERROR;
+                }
+            } break;
         }
     }
 
     #undef BINARY_OP
+    #undef READ_STRING
     #undef READ_CONSTANT
     #undef READ_BYTE
 }

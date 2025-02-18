@@ -23,6 +23,7 @@ struct LoxVM
     Value *stackTop;
     Obj *objects;
     Table strings;
+    Table globals;
     Compiler *compiler;
 };
 

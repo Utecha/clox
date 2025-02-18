@@ -9,6 +9,7 @@ typedef enum
     OP_NIL,
     OP_FALSE,
     OP_TRUE,
+    OP_POP,
     OP_NEGATE,
     OP_NOT,
     OP_ADD,
@@ -19,9 +20,13 @@ typedef enum
     OP_GREATER,
     OP_LESS,
     OP_RETURN,
+    OP_PRINT,
 
     // Constant Instructions (2 bytes)
     OP_CONSTANT,
+    OP_DEFINE_GLOBAL,
+    OP_GET_GLOBAL,
+    OP_SET_GLOBAL,
 
     // Count
     OP_COUNT,

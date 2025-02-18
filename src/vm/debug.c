@@ -1,25 +1,31 @@
 #include <stdio.h>
 #include "debug.h"
+#include "chunk.h"
 #include "lexer.h"
 
 const char *opcodes[OP_COUNT] = {
     // Simple Instructions (1 byte)
-    [OP_NIL]        = "NIL",
-    [OP_FALSE]      = "FALSE",
-    [OP_TRUE]       = "TRUE",
-    [OP_NEGATE]     = "NEGATE",
-    [OP_NOT]        = "NOT",
-    [OP_ADD]        = "ADD",
-    [OP_SUBTRACT]   = "SUBTRACT",
-    [OP_MULTIPLY]   = "MULTIPLY",
-    [OP_DIVIDE]     = "DIVIDE",
-    [OP_EQUAL]      = "EQUAL",
-    [OP_GREATER]    = "GREATER",
-    [OP_LESS]       = "LESS",
-    [OP_RETURN]     = "RETURN",
+    [OP_NIL]            = "NIL",
+    [OP_FALSE]          = "FALSE",
+    [OP_TRUE]           = "TRUE",
+    [OP_POP]            = "POP",
+    [OP_NEGATE]         = "NEGATE",
+    [OP_NOT]            = "NOT",
+    [OP_ADD]            = "ADD",
+    [OP_SUBTRACT]       = "SUBTRACT",
+    [OP_MULTIPLY]       = "MULTIPLY",
+    [OP_DIVIDE]         = "DIVIDE",
+    [OP_EQUAL]          = "EQUAL",
+    [OP_GREATER]        = "GREATER",
+    [OP_LESS]           = "LESS",
+    [OP_RETURN]         = "RETURN",
+    [OP_PRINT]          = "PRINT",
 
     // Constant Instructions (2 bytes)
-    [OP_CONSTANT]   = "CONSTANT",
+    [OP_CONSTANT]       = "CONSTANT",
+    [OP_DEFINE_GLOBAL]  = "DEFINE GLOBAL",
+    [OP_GET_GLOBAL]     = "GET GLOBAL",
+    [OP_SET_GLOBAL]     = "SET GLOBAL",
 };
 
 const char *tokenTypes[TK_COUNT] = {
@@ -109,6 +115,7 @@ int disassembleInstruction(Chunk *chunk, int offset)
         case OP_NIL:
         case OP_FALSE:
         case OP_TRUE:
+        case OP_POP:
         case OP_NEGATE:
         case OP_NOT:
         case OP_ADD:
@@ -119,9 +126,13 @@ int disassembleInstruction(Chunk *chunk, int offset)
         case OP_GREATER:
         case OP_LESS:
         case OP_RETURN:
+        case OP_PRINT:
             return simpleInstruction(name, offset);
         case OP_CONSTANT:
-            return constantInstruction("CONSTANT", chunk, offset);
+        case OP_DEFINE_GLOBAL:
+        case OP_GET_GLOBAL:
+        case OP_SET_GLOBAL:
+            return constantInstruction(name, chunk, offset);
         default:
             printf("Unknown OpCode: %d", instruction);
             return offset + 1;
