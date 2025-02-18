@@ -8,7 +8,7 @@ endif()
 
 project(
     lox
-    VERSION 0.0.4
+    VERSION 0.0.6
     DESCRIPTION "A class-based scripting language"
     LANGUAGES C CXX
 )

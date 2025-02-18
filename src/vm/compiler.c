@@ -81,6 +81,7 @@ static void parsePrecedence(Compiler *compiler, Precedence precedence);
 static void expression(Compiler *compiler);
 static void statement(Compiler *compiler);
 static void declaration(Compiler *compiler);
+static void varDeclaration(Compiler *compiler);
 
 // Parser ----------------------------------------------------------------------
 static void initParser(Parser *parser, Lexer *lexer, LoxVM *vm)
@@ -604,8 +605,11 @@ static int getByteCount(const uint8_t *code, const Value *constants, int ip)
 
 static void endLoop(Compiler *compiler)
 {
-    patchJump(compiler, compiler->loop->exit);
-    emitByte(compiler, OP_POP);
+    if (compiler->loop->exit != -1)
+    {
+        patchJump(compiler, compiler->loop->exit);
+        emitByte(compiler, OP_POP);
+    }
 
     int i = compiler->loop->body;
     while (i < currentChunk(compiler)->code.count)
@@ -661,9 +665,73 @@ static void continueStatement(Compiler *compiler)
 
 static void expressionStatement(Compiler *compiler)
 {
+    if (match(compiler, TK_SEMICOLON)) return;
     expression(compiler);
-    consume(compiler, TK_SEMICOLON, "Expected ';' after 'value'.");
+    consume(compiler, TK_SEMICOLON, "Expected ';' after expression.");
     emitByte(compiler, OP_POP);
+}
+
+static void forStatement(Compiler *compiler)
+{
+    beginScope(compiler);
+
+    bool hasLeftParen = false;
+    if (match(compiler, TK_LPAREN)) hasLeftParen = true;
+
+    /* Initializer */
+    if (match(compiler, TK_SEMICOLON))
+        { /* No initializer */ }
+    else if (match(compiler, TK_VAR))
+        { varDeclaration(compiler); }
+    else
+        { expressionStatement(compiler); }
+
+    Loop loop;
+    startLoop(compiler, &loop);
+
+    /* Condition */
+    compiler->loop->exit = -1;
+    if (!match(compiler, TK_SEMICOLON))
+    {
+        expression(compiler);
+        consume(compiler, TK_SEMICOLON, "Expected ';' after 'for' condition");
+
+        // Exit the loop if the condition is false
+        testLoopExit(compiler);
+        emitByte(compiler, OP_POP);
+    }
+
+    /* Increment */
+    if (!match(compiler, TK_RPAREN))
+    {
+        int bodyJump = emitJump(compiler, OP_JUMP);
+        int incrementStart = currentChunk(compiler)->code.count;
+
+        expression(compiler);
+        emitByte(compiler, OP_POP);
+        if (match(compiler, TK_RPAREN))
+        {
+            if (!hasLeftParen) error(compiler, "Right parenthesis found with no matching left");
+        }
+        else
+        {
+            if (hasLeftParen) error(compiler, "Left parenthesis found with no matching right");
+        }
+
+        emitLoop(compiler, compiler->loop->start);
+        compiler->loop->start = incrementStart;
+        patchJump(compiler, bodyJump);
+    }
+
+    if (!(compiler->parser->previous.type == TK_RPAREN) && !hasLeftParen && !check(compiler, TK_LBRACE))
+    {
+        error(compiler, "Parenthesis surrounding 'for' clauses are required for single line 'for' loops");
+    }
+
+    loopBody(compiler);
+    emitLoop(compiler, compiler->loop->start);
+    endLoop(compiler);
+    endScope(compiler);
 }
 
 static void ifStatement(Compiler *compiler)
@@ -702,22 +770,10 @@ static void whileStatement(Compiler *compiler)
 
     testLoopExit(compiler);
     emitByte(compiler, OP_POP);
+
     loopBody(compiler);
     emitLoop(compiler, loop.start);
     endLoop(compiler);
-    // int loopStart = currentChunk(compiler)->code.count;
-
-    // consume(compiler, TK_LPAREN, "Expected '(' after 'while'");
-    // expression(compiler);
-    // consume(compiler, TK_RPAREN, "Expected ')' after 'while' condition");
-
-    // int exitJump = emitJump(compiler, OP_JUMP_IF);
-    // emitByte(compiler, OP_POP);
-    // statement(compiler);
-    // emitLoop(compiler, loopStart);
-
-    // patchJump(compiler, exitJump);
-    // emitByte(compiler, OP_POP);
 }
 
 static void statement(Compiler *compiler)
@@ -729,6 +785,10 @@ static void statement(Compiler *compiler)
     else if (match(compiler, TK_CONTINUE))
     {
         continueStatement(compiler);
+    }
+    else if (match(compiler, TK_FOR))
+    {
+        forStatement(compiler);
     }
     else if (match(compiler, TK_IF))
     {
