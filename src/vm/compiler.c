@@ -290,10 +290,25 @@ static void conditional(Compiler *compiler, bool canAssign)
     int ifJump = emitJump(compiler, OP_JUMP_IF);
     parsePrecedence(compiler, PREC_CONDITIONAL);
     consume(compiler, TK_COLON, "Expected ':' after conditional 'then' branch");
+
     int elseJump = emitJump(compiler, OP_JUMP);
     patchJump(compiler, ifJump);
     parsePrecedence(compiler, PREC_ASSIGNMENT);
     patchJump(compiler, elseJump);
+}
+
+static void or(Compiler *compiler, bool canAssign)
+{
+    int jump = emitJump(compiler, OP_OR);
+    parsePrecedence(compiler, PREC_OR);
+    patchJump(compiler, jump);
+}
+
+static void and(Compiler *compiler, bool canAssign)
+{
+    int jump = emitJump(compiler, OP_AND);
+    parsePrecedence(compiler, PREC_AND);
+    patchJump(compiler, jump);
 }
 
 static void binary(Compiler *compiler, bool canAssign)
@@ -433,7 +448,7 @@ ParseRule rules[] = {
     [TK_IDENTIFIER]     = PREFIX(variable),
     [TK_NUMBER]         = PREFIX(number),
     [TK_STRING]         = PREFIX(string),
-    [TK_AND]            = UNUSED,
+    [TK_AND]            = MIXFIX(NULL, and, PREC_AND),
     [TK_CLASS]          = UNUSED,
     [TK_CONST]          = UNUSED,
     [TK_ELSE]           = UNUSED,
@@ -442,7 +457,7 @@ ParseRule rules[] = {
     [TK_FUN]            = UNUSED,
     [TK_IF]             = UNUSED,
     [TK_NIL]            = PREFIX(literal),
-    [TK_OR]             = UNUSED,
+    [TK_OR]             = MIXFIX(NULL, or, PREC_OR),
     [TK_PRINT]          = UNUSED,
     [TK_RETURN]         = UNUSED,
     [TK_SUPER]          = UNUSED,

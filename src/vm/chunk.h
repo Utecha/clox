@@ -36,6 +36,8 @@ typedef enum
     OP_JUMP,
     OP_JUMP_IF,
     OP_LOOP,
+    OP_AND,
+    OP_OR,
 
     // Count
     OP_COUNT,
