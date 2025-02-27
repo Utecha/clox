@@ -391,7 +391,7 @@ static InterpretResult runInterpreter(LoxVM *vm)
 InterpretResult interpret(LoxVM *vm, char *source)
 {
     ObjFn *function = compile(vm, source);
-    if (function == NULL) return RESULT_COMPILE_ERROR;
+    if (!function) return RESULT_COMPILE_ERROR;
 
     pushVM(vm, OBJ_VAL(function));
     call(vm, function, 0);

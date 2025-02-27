@@ -132,6 +132,8 @@ static inline bool isObjType(Value value, ObjType type)
 #define IS_NATIVE(value)    isObjType(value, OBJ_NATIVE)
 #define IS_STRING(value)    isObjType(value, OBJ_STRING)
 
+#define CONST_STRING(vm, text) newStringLength((vm), (text), sizeof(text) - 1)
+
 ObjFn *newFunction(LoxVM *vm);
 ObjNative *newNative(LoxVM *vm, NativeFn function, int arity);
 ObjString *newStringLength(LoxVM *vm, const char *chars, size_t length);
