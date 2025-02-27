@@ -230,7 +230,8 @@ Token getToken(Lexer *lexer)
         case '-':   return makeToken(lexer, TK_MINUS);
         case '+':   return makeToken(lexer, TK_PLUS);
         case '/':   return makeToken(lexer, TK_SLASH);
-        case '*':   return makeToken(lexer, TK_STAR);
+        case '%':   return makeToken(lexer, TK_MODULUS);
+        case '*':   return twoCharToken(lexer, '*', TK_POWER, TK_STAR);
         case '!':   return twoCharToken(lexer, '=', TK_BANGEQ, TK_BANG);
         case '=':   return twoCharToken(lexer, '=', TK_EQEQ, TK_EQUAL);
         case '>':   return twoCharToken(lexer, '=', TK_GTEQ, TK_GT);

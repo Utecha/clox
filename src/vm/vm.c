@@ -1,3 +1,4 @@
+#include <math.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
@@ -162,6 +163,19 @@ static InterpretResult runInterpreter(LoxVM *vm)
             pushVM(vm, valueType(a op b));                                          \
         } while (false)
 
+    #define BINARY_OP_FN(valueType, fn)                                             \
+        do                                                                          \
+        {                                                                           \
+            if (!IS_NUMBER(peekVM(vm, 0)) && !IS_NUMBER(peekVM(vm, 1)))             \
+            {                                                                       \
+                runtimeError(vm, "Binary (non-addition) operands must be numbers"); \
+                return RESULT_RUNTIME_ERROR;                                        \
+            }                                                                       \
+            double b = AS_NUMBER(popVM(vm));                                        \
+            double a = AS_NUMBER(popVM(vm));                                        \
+            pushVM(vm, valueType(fn(a, b)));                                        \
+        } while (false)
+
     for (;;)
     {
         #if TRACE_INSTRUCTIONS
@@ -233,6 +247,23 @@ static InterpretResult runInterpreter(LoxVM *vm)
                 break;
             case OP_DIVIDE:
                 BINARY_OP(NUMBER_VAL, /);
+                break;
+            case OP_REMAINDER:
+            {
+                if (IS_NUMBER(peekVM(vm, 0)) && IS_NUMBER(peekVM(vm, 1)))
+                {
+                    double b = AS_NUMBER(popVM(vm));
+                    double a = AS_NUMBER(popVM(vm));
+                    pushVM(vm, NUMBER_VAL(fmod(a, b)));
+                }
+                else
+                {
+                    runtimeError(vm, "Binary (non-addition) operands must be numbers");
+                    return RESULT_RUNTIME_ERROR;
+                }
+            } break;
+            case OP_POWER:
+                BINARY_OP_FN(NUMBER_VAL, pow);
                 break;
             case OP_EQUAL:
             {
@@ -359,6 +390,7 @@ static InterpretResult runInterpreter(LoxVM *vm)
         }
     }
 
+    #undef BINARY_OP_FN
     #undef BINARY_OP
     #undef LOAD_FRAME
     #undef READ_STRING

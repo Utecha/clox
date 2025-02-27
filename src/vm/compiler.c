@@ -388,16 +388,18 @@ static void binary(Compiler *compiler, bool canAssign)
 
     switch (operator)
     {
-        case TK_BANGEQ: emitBytes(compiler, OP_EQUAL, OP_NOT); break;
-        case TK_EQEQ:   emitByte(compiler, OP_EQUAL); break;
-        case TK_GT:     emitByte(compiler, OP_GREATER); break;
-        case TK_GTEQ:   emitBytes(compiler, OP_LESS, OP_NOT); break;
-        case TK_LT:     emitByte(compiler, OP_LESS); break;
-        case TK_LTEQ:   emitBytes(compiler, OP_GREATER, OP_NOT); break;
-        case TK_MINUS:  emitByte(compiler, OP_SUBTRACT); break;
-        case TK_PLUS:   emitByte(compiler, OP_ADD); break;
-        case TK_SLASH:  emitByte(compiler, OP_DIVIDE); break;
-        case TK_STAR:   emitByte(compiler, OP_MULTIPLY); break;
+        case TK_BANGEQ:     emitBytes(compiler, OP_EQUAL, OP_NOT); break;
+        case TK_EQEQ:       emitByte(compiler, OP_EQUAL); break;
+        case TK_GT:         emitByte(compiler, OP_GREATER); break;
+        case TK_GTEQ:       emitBytes(compiler, OP_LESS, OP_NOT); break;
+        case TK_LT:         emitByte(compiler, OP_LESS); break;
+        case TK_LTEQ:       emitBytes(compiler, OP_GREATER, OP_NOT); break;
+        case TK_MINUS:      emitByte(compiler, OP_SUBTRACT); break;
+        case TK_PLUS:       emitByte(compiler, OP_ADD); break;
+        case TK_SLASH:      emitByte(compiler, OP_DIVIDE); break;
+        case TK_STAR:       emitByte(compiler, OP_MULTIPLY); break;
+        case TK_MODULUS:    emitByte(compiler, OP_REMAINDER); break;
+        case TK_POWER:      emitByte(compiler, OP_POWER); break;
         default:        return; // Unreachable
     }
 }
@@ -540,6 +542,8 @@ ParseRule rules[] = {
     [TK_PLUS]           = INFIX(binary, PREC_TERM),
     [TK_SLASH]          = INFIX(binary, PREC_FACTOR),
     [TK_STAR]           = INFIX(binary, PREC_FACTOR),
+    [TK_MODULUS]        = INFIX(binary, PREC_FACTOR),
+    [TK_POWER]          = INFIX(binary, PREC_FACTOR),
     [TK_BANG]           = PREFIX(unary),
     [TK_IDENTIFIER]     = PREFIX(variable),
     [TK_NUMBER]         = PREFIX(number),

@@ -38,6 +38,8 @@ typedef enum
     /* Factor */
     TK_SLASH,
     TK_STAR,
+    TK_MODULUS,
+    TK_POWER,
 
     /* Logical NOT */
     TK_BANG,

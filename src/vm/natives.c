@@ -21,13 +21,7 @@ static Value clockNative(int argc, Value *args)
     return NUMBER_VAL((double)clock() / CLOCKS_PER_SEC);
 }
 
-static Value falseyNative(int argc, Value *args)
-{
-    return BOOL_VAL(IS_NIL(args[0]) || (IS_BOOL(args[0]) && !AS_BOOL(args[0])));
-}
-
 void defineNatives(LoxVM *vm)
 {
     defineNative(vm, "clock", clockNative, 0);
-    defineNative(vm, "falsey", falseyNative, 1);
 }

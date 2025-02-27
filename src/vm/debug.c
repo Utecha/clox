@@ -16,6 +16,8 @@ const char *opcodes[OP_COUNT] = {
     [OP_SUBTRACT]       = "SUBTRACT",
     [OP_MULTIPLY]       = "MULTIPLY",
     [OP_DIVIDE]         = "DIVIDE",
+    [OP_REMAINDER]      = "REMAINDER",
+    [OP_POWER]          = "POWER OF",
     [OP_EQUAL]          = "EQUAL",
     [OP_GREATER]        = "GREATER",
     [OP_LESS]           = "LESS",
@@ -65,6 +67,8 @@ const char *tokenTypes[] = {
     [TK_PLUS]       = "PLUS",
     [TK_SLASH]      = "SLASH",
     [TK_STAR]       = "STAR",
+    [TK_MODULUS]    = "MODULUS",
+    [TK_POWER]      = "POWER",
     [TK_BANG]       = "BANG",
     [TK_IDENTIFIER] = "IDENTIFIER",
     [TK_NUMBER]     = "NUMBER",
@@ -154,6 +158,8 @@ int disassembleInstruction(Chunk *chunk, int offset)
         case OP_SUBTRACT:
         case OP_MULTIPLY:
         case OP_DIVIDE:
+        case OP_REMAINDER:
+        case OP_POWER:
         case OP_EQUAL:
         case OP_GREATER:
         case OP_LESS:
