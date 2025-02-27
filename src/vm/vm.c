@@ -249,19 +249,8 @@ static InterpretResult runInterpreter(LoxVM *vm)
                 BINARY_OP(NUMBER_VAL, /);
                 break;
             case OP_REMAINDER:
-            {
-                if (IS_NUMBER(peekVM(vm, 0)) && IS_NUMBER(peekVM(vm, 1)))
-                {
-                    double b = AS_NUMBER(popVM(vm));
-                    double a = AS_NUMBER(popVM(vm));
-                    pushVM(vm, NUMBER_VAL(fmod(a, b)));
-                }
-                else
-                {
-                    runtimeError(vm, "Binary (non-addition) operands must be numbers");
-                    return RESULT_RUNTIME_ERROR;
-                }
-            } break;
+                BINARY_OP_FN(NUMBER_VAL, fmod);
+                break;
             case OP_POWER:
                 BINARY_OP_FN(NUMBER_VAL, pow);
                 break;
