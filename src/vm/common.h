@@ -20,7 +20,7 @@ typedef struct Table Table;
     * If enabled, the VM will disassemble and dump an entire
     * compiled bytecode chunk to the standard error stream.
     */
-    #define DUMP_CHUNK 0
+    #define DUMP_CHUNK 1
 
     /*
     * If enabled, the execution of the compiler itself will
@@ -52,7 +52,7 @@ typedef struct Table Table;
     *   reallocation
     * - The memory address of the object
     */
-    #define LOG_GC 0
+    #define LOG_GC 1
 
     /*
     * If enabled, the GC will be stress tested by significantly

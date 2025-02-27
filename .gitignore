@@ -6,3 +6,6 @@ scratch*
 
 # Backup files
 backup/
+
+# Clangd
+.cache

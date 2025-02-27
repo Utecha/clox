@@ -22,6 +22,8 @@ if(NOT CMAKE_BUILD_TYPE)
     message(STATUS "Setting default build type to '${CMAKE_BUILD_TYPE}'")
 endif()
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 add_executable(${PROJECT_NAME})
 target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_SOURCE_DIR}/src/vm)
 add_subdirectory(src)
@@ -49,3 +51,5 @@ else()
     endif()
     target_link_libraries(${PROJECT_NAME} readline)
 endif()
+
+target_link_libraries(${PROJECT_NAME} m)

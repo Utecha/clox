@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 #include "debug.h"
 #include "chunk.h"
 #include "lexer.h"
@@ -41,7 +42,7 @@ const char *opcodes[OP_COUNT] = {
     [OP_END]            = "END",
 };
 
-const char *tokenTypes[TK_COUNT] = {
+const char *tokenTypes[] = {
     [TK_ERROR]      = "ERROR",
     [TK_EOF]        = "EOF",
     [TK_LPAREN]     = "LPAREN",

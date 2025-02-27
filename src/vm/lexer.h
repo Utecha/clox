@@ -67,9 +67,6 @@ typedef enum
     TK_TRUE,
     TK_VAR,
     TK_WHILE,
-
-    /* Count */
-    TK_COUNT,
 } TokenType;
 
 typedef struct
