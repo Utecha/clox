@@ -1,9 +1,9 @@
 #ifndef lox_compiler_h
 #define lox_compiler_h
 
-#include "common.h"
+#include "chunk.h"
 #include "vm.h"
 
-ObjFn *compile(LoxVM *vm, const char *source);
+bool compile(LoxVM *vm, const char *source, Chunk *chunk);
 
 #endif // lox_compiler_h

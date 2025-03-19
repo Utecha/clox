@@ -1,13 +1,13 @@
-#ifndef lox_lexer_h
-#define lox_lexer_h
+#ifndef lox_scanner_h
+#define lox_scanner_h
 
 typedef enum
 {
-    /* Special */
+    // Special
     TK_ERROR,
     TK_EOF,
 
-    /* Delimiter */
+    // Delimiter
     TK_LPAREN,
     TK_RPAREN,
     TK_LBRACE,
@@ -16,45 +16,36 @@ typedef enum
     TK_DOT,
     TK_SEMICOLON,
 
-    /* Assignment */
+    // Assignment
     TK_EQUAL,
 
-    /* Conditional */
-    TK_COLON,
-    TK_QUESTION,
+    // Logical
+    TK_NOT,
 
-    /* Comparison/Equality */
-    TK_BANGEQ,
+    // Equality
+    TK_NOTEQ,
     TK_EQEQ,
+
+    // Comparison
     TK_GT,
     TK_GTEQ,
     TK_LT,
     TK_LTEQ,
 
-    /* Term */
+    // Arithmetic
     TK_MINUS,
     TK_PLUS,
-
-    /* Factor */
     TK_SLASH,
     TK_STAR,
-    TK_MODULUS,
-    TK_POWER,
 
-    /* Logical NOT */
-    TK_BANG,
-
-    /* Literals */
+    // Literals
     TK_IDENTIFIER,
     TK_NUMBER,
     TK_STRING,
 
-    /* Keyword */
+    // Keywords
     TK_AND,
-    TK_BREAK,
     TK_CLASS,
-    TK_CONST,
-    TK_CONTINUE,
     TK_ELSE,
     TK_FALSE,
     TK_FOR,
@@ -74,7 +65,7 @@ typedef enum
 typedef struct
 {
     TokenType type;
-    const char *lexeme;
+    const char *start;
     int length;
     int line;
 } Token;
@@ -84,9 +75,9 @@ typedef struct
     const char *start;
     const char *current;
     int line;
-} Lexer;
+} Scanner;
 
-void initLexer(Lexer *lexer, const char *source);
-Token getToken(Lexer *lexer);
+void init_scanner(Scanner *scanner, const char *source);
+Token scan_token(Scanner *scanner);
 
-#endif // lox_lexer_h
+#endif // lox_scanner_h
