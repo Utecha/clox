@@ -40,6 +40,7 @@ struct ObjString
 {
     Obj obj;
     int length;
+    uint32_t hash;
     char *data;
 };
 
@@ -83,6 +84,7 @@ bool values_equal(Value a, Value b);
 // Object Functions
 ObjString *copy_string(LoxVM *vm, const char *data, int length);
 ObjString *take_string(LoxVM *vm, char *data, int length);
+bool string_equals_cstring(ObjString *string, const char *cstring, int length, uint32_t hash);
 
 // ValueArray Functions
 void init_value_array(ValueArray *array);

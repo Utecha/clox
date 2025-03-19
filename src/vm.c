@@ -20,11 +20,13 @@ void init_lox_vm(LoxVM *vm)
 {
     reset_stack(vm);
     vm->objects = NULL;
+    init_table(&vm->strings);
     vm->compiler = NULL;
 }
 
 void free_lox_vm(LoxVM *vm)
 {
+    free_table(vm, &vm->strings);
     free_objects(vm);
 }
 
