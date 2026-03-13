@@ -1,9 +1,8 @@
 # Build files
 build/
-build.sh
 
 # Scratch files
 scratch*
 
 # clangd
-.cache
+.cache/

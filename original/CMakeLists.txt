@@ -1,22 +1,31 @@
-message("Configuring ${LOX} v${LOX_VERSION} ...")
+message("Configuring ${CLOX} v${CLOX_VERSION} ...")
 
 set(SOURCES
+    chunk.c
+    compiler.c
+    debug.c
     main.c
+    memory.c
+    object.c
+    scanner.c
+    table.c
+    value.c
+    vm.c
 )
 
-add_executable(${LOX} ${SOURCES})
+add_executable(${CLOX} ${SOURCES})
 
 set_target_properties(
-    ${LOX} PROPERTIES
+    ${CLOX} PROPERTIES
     ARCHIVE_OUTPUT_DIRECTORY ${BINARY_OUTPUT_TARGET}
     LIBRARY_OUTPUT_DIRECTORY ${BINARY_OUTPUT_TARGET}
     RUNTIME_OUTPUT_DIRECTORY ${BINARY_OUTPUT_TARGET}
 )
 
 target_compile_options(
-    ${LOX} PRIVATE
+    ${CLOX} PRIVATE
     $<$<C_COMPILER_ID:MSVC>:
-        /W4
+        /W2
         $<$<CONFIG:Debug>:/Zi>
     >
     $<$<C_COMPILER_ID:GNU>:
@@ -36,7 +45,15 @@ target_compile_options(
 )
 
 target_compile_definitions(
-    ${LOX} PRIVATE
+    ${CLOX} PRIVATE
     $<$<CONFIG:Debug>:DEBUG>
     NAN_TAGGING=$<IF:$<BOOL:${NAN_TAGGING}>,1,0>
 )
+
+# The `readline` library technically exists for Windows, but it's not exactly
+# straight forward to install and make available for use, so it is omitted.
+# It is otherwise available for both Linux and MacOS and on many distros is
+# installed by default.
+if(NOT WIN32)
+    target_link_libraries(${CLOX} PRIVATE readline)
+endif()

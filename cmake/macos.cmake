@@ -2,18 +2,32 @@ set(CMAKE_SYSTEM_NAME Apple)
 message(STATUS "Using Apple toolchain")
 
 set(CMAKE_C_STANDARD 99)
-set(CMAKE_CXX_STANDARD 11)
 message(STATUS "C Standard: ${CMAKE_C_STANDARD}")
-message(STATUS "C++ Standard: ${CMAKE_CXX_STANDARD}")
 
 set(CMAKE_C_EXTENSIONS OFF)
-set(CMAKE_CXX_EXTENSIONS OFF)
 message(STATUS "C Extensions: ${CMAKE_C_EXTENSIONS}")
-message(STATUS "C++ Extensions: ${CMAKE_CXX_EXTENSIONS}")
 
-# MacOS users who don't have clang will get prompted to install it if you
-# attempt to use it. Therefore, no real checks are needed. It is at this point
-# kind of the goto C/C++ compiler set for many including myself.
-message(STATUS "Compiling using (clang/clang++)")
-set(CMAKE_C_COMPILER clang CACHE STRING "C Compiler")
-set(CMAKE_CXX_COMPILER clang++ CACHE STRING "C++ Compiler")
+# Clang is preferred so we check for it first
+find_program(CLANG clang)
+
+if(CLANG)
+    set(CMAKE_C_COMPILER ${CLANG} CACHE FILEPATH "C Compiler")
+    message(STATUS "Compiler: ${CMAKE_C_COMPILER}")
+else()
+    # If clang isn't found, fall back to gcc.
+    find_program(GCC gcc)
+
+    if(GCC)
+        set(CMAKE_C_COMPILER ${GCC} CACHE FILEPATH "C Compiler")
+        message(STATUS "Compiler: ${CMAKE_C_COMPILER}")
+    else()
+        # On MacOS, like Linux, we could theoretically fall back to something
+        # like tcc, however it is significantly more rare for any user to have
+        # so instead we error out here.
+        message(FATAL_ERROR
+            "Could not find a supported C compiler. "
+            "Ensure that you have either `gcc` or `clang` installed and "
+            "available in your PATH!"
+        )
+    endif()
+endif()
