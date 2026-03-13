@@ -1,7 +1,11 @@
 message("Configuring ${LOX} v${LOX_VERSION} ...")
 
 set(SOURCES
+    debug.c
     main.c
+    memory.c
+    value.c
+    vm.c
 )
 
 add_executable(${LOX} ${SOURCES})

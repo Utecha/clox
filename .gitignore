@@ -4,5 +4,6 @@ build/
 # Scratch files
 scratch*
 
-# clangd
+# LSP's
 .cache/
+.vs/

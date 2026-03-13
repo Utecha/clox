@@ -1,7 +1,13 @@
-#include <stdio.h>
+#include "debug.h"
+#include "opcode.h"
+#include "value.h"
+
+//------------------------------------------------------------------------------
 
 int main(void)
 {
-    puts("Hello, World!");
+    LoxVM *vm = newVM();
+    interpret(vm, NULL);
+    freeVM(vm);
     return 0;
 }
