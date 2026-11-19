@@ -1,20 +1,26 @@
 #include <stdio.h>
 
-#include "lox_memory.h"
+#include "lox_array.h"
 #include "lox_vm.h"
 
-//------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
+
+lox_define_array_t(uint8_t, Byte);
+
+static LoxVM vm = { 0 };
+
+//--------------------------------------------------------------------------------------------------
 
 int main(void)
 {
-    LoxVM vm = { 0 };
-    ssize_t capacity = 2;
-    int *ints = LOX_ALLOCA(int, &vm, capacity);
+    ByteArray code;
+    lox_init_array(&code);
 
-    ints[0] = 34;
-    ints[1] = 35;
-    printf("%d + %d = %d\n", ints[0], ints[1], ints[0] + ints[1]);
+    lox_array_append(&vm, &code, 34);
+    lox_array_append(&vm, &code, 35);
 
-    LOX_FREEA(int, &vm, ints, capacity);
+    printf("%d + %d = %d\n", code.data[0], code.data[1], code.data[0] + code.data[1]);
+
+    lox_clear_array(&vm, &code);
     return 0;
 }

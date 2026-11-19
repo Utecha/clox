@@ -28,9 +28,8 @@ One final note: The ultimate goal in the end is to allow embedding of the new
 
 Later on, once more of the language has been reimplemented, I will be switching
 over to building the project as a library with a separate executable that
-statically links with the new `liblox`. This also means that prefixes will later
-be added to everything that is a part of the API. Some of this work will be done
-along the way (i.e. `VM` is already renamed to `LoxVM` as of this version.)
+statically links with the new `liblox`. The API is being written with prefixes
+ahead of time to prepare for this.
 
 ### Features
 
@@ -43,3 +42,5 @@ along the way (i.e. `VM` is already renamed to `LoxVM` as of this version.)
 - The sizing of memory allocations now uses the signed size type `ssize_t`
 rather than unsigned `size_t` to prevent a number of bugs related to unsigned
 sizes.
+- Added `lox_array.h` for generically defining and working with custom dynamic
+array types.
