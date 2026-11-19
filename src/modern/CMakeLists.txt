@@ -7,6 +7,7 @@ message("Configuring ${LOX_MODERN} Version ${LOX_MODERN_VERSION}")
 target_sources(
   ${LOX_MODERN} PRIVATE
   main.c
+  lox_memory.c
 )
 
 set_target_properties(

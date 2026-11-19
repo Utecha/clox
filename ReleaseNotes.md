@@ -2,6 +2,8 @@
 
 ## Lox 'Modern' Version 0.0.1
 
+### Preamble
+
 For some time now I've been slowly working on a rewrite of the project in
 modern C23. I have run into some bugs in that rewrite that I have not yet
 found the solution to, as well as having gone back and forth on ideas for
@@ -21,9 +23,23 @@ lead up to the completion of each version. Code will only be pushed once each
 version (feature) is complete, and only after significant review to ensure
 correctness and stability.
 
+One final note: The ultimate goal in the end is to allow embedding of the new
+"modern" version. The header `lox.h` will feature the public API.
+
+Later on, once more of the language has been reimplemented, I will be switching
+over to building the project as a library with a separate executable that
+statically links with the new `liblox`. This also means that prefixes will later
+be added to everything that is a part of the API. Some of this work will be done
+along the way (i.e. `VM` is already renamed to `LoxVM` as of this version.)
+
 ### Features
 
 ### Internal
 
-- Add `lox.h`, replacing the former `common.h`.
-- Rename `VMResult` to `LoxRuntimeResult`.
+- Added `lox.h`, replacing the former `common.h`.
+- Renamed `VMResult` to `LoxRuntimeResult`.
+- Added `lox_vm.h`.
+- Added `lox_memory.h` and `lox_memory.c`.
+- The sizing of memory allocations now uses the signed size type `ssize_t`
+rather than unsigned `size_t` to prevent a number of bugs related to unsigned
+sizes.

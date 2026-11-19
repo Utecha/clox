@@ -6,6 +6,13 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#if defined(_MSC_VER)
+    #include <BaseTsd.h>
+    typedef SSIZE_T ssize_t;
+#else
+    #include <sys/types.h> // For ssize_t
+#endif // _MSC_VER
+
 //--------------------------------------------------------------------------------------------------
 
 /**
