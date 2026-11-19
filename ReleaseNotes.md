@@ -33,9 +33,18 @@ ahead of time to prepare for this.
 
 ### Features
 
+- Added the `LoxReallocateFn` function pointer type to allow users to replace
+the VM's default allocator with a custom one.
+- Added a default implementation for the VM's `LoxReallocateFn`.
+- Added platform management to `lox.h` and the necessary code for defining the
+public API.
+- Added semantic versioning data to `lox.h`.
+- Added new `lox_new_vm` and `lox_free_vm` public API functions to `lox.h`.
+
 ### Internal
 
-- Added `lox.h`, replacing the former `common.h`.
+- Added `lox.h`, replacing the former `common.h` and serving as the public API
+header to be included in other projects.
 - Renamed `VMResult` to `LoxRuntimeResult`.
 - Added `lox_vm.h`.
 - Added `lox_memory.h` and `lox_memory.c`.
@@ -43,4 +52,5 @@ ahead of time to prepare for this.
 rather than unsigned `size_t` to prevent a number of bugs related to unsigned
 sizes.
 - Added `lox_array.h` for generically defining and working with custom dynamic
-array types.
+array types that are managed with the VM's allocator.
+- Added `lox_vm.c`.

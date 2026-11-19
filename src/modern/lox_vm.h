@@ -8,6 +8,7 @@
 struct LoxVM
 {
     ssize_t bytes_allocated;
+    LoxReallocateFn reallocate;
 };
 
 #endif // LOX_VM_H

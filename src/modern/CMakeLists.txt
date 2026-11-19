@@ -8,6 +8,7 @@ target_sources(
   ${LOX_MODERN} PRIVATE
   main.c
   lox_memory.c
+  lox_vm.c
 )
 
 set_target_properties(

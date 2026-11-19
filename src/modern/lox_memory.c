@@ -22,12 +22,5 @@ size_t lox_next_power_of_two(size_t n)
 void *lox_reallocate(LoxVM *vm, void *ptr, ssize_t old_size, ssize_t new_size)
 {
     vm->bytes_allocated += new_size - old_size;
-
-    if (new_size == 0)
-    {
-        free(ptr);
-        return nullptr;
-    }
-
-    return realloc(ptr, (size_t)new_size);
+    return vm->reallocate(ptr, new_size);
 }
