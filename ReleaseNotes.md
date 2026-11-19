@@ -16,6 +16,11 @@ Much like the original implementation (in the original, now deleted repo),
 each version will correspond to the completion of a specific feature, typically
 a specific chapter of the book.
 
+Unlike the original implementation, there may be multiple smaller commits that
+lead up to the completion of each version. Code will only be pushed once each
+version (feature) is complete, and only after significant review to ensure
+correctness and stability.
+
 ### Features
 
 ### Internal
