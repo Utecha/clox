@@ -1,9 +1,18 @@
 # Build files
 build/
 
+# Prototyping
+proto/
+
 # Scratch files
 scratch*
+*.scratch
 
 # LSP's
 .cache/
 .vs/
+
+# IDE's
+.idea/
+.vscode/
+.zed/

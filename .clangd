@@ -2,4 +2,4 @@ Diagnostics:
   UnusedIncludes: None
 ---
 CompileFlags:
-    Add: [-xc, -Wc99-designator, -DDEBUG]
+    Add: [-xc, -std=c23]
