@@ -24,3 +24,6 @@ correctness and stability.
 ### Features
 
 ### Internal
+
+- Add `lox.h`, replacing the former `common.h`.
+- Rename `VMResult` to `LoxRuntimeResult`.
