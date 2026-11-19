@@ -39,6 +39,16 @@ function build -a refresh
     cmake --build $build_directory -j
 end
 
+function run -a file
+    if test -e $build_directory/$build_type/$program
+        if set -q file
+            ./$build_directory/$build_type/$program $file
+        else
+            ./$build_directory/$build_type/$program
+        end
+    end
+end
+
 argparse b/build c/config f/fresh r/run -- $argv
 or return
 
